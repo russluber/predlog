@@ -1,0 +1,41 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Test and coverage outputs
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Local Predlog data
+.predlog/
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated plots and exports
+plots/
+exports/
+*.png
+*.csv
+
+# Environment variables
+.env
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
