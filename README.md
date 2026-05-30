@@ -1,3 +1,3 @@
-# predlog
+# Predlog
 
-A personal CLI prediction tracker and calibration tool.
+**Predlog** is a personal CLI tool for probabilistic prediction tracking and calibration.
