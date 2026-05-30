@@ -40,5 +40,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Planning architecture file
+# Ignored local files for planning and project progress tracking
 architecture.md
+project-progress.md
