@@ -45,7 +45,7 @@ def binary(
         typer.Option(
             ...,
             "--prob",
-            help="Forecast probability as a percentage from 0 to 100.",
+            help="Forecast probability as a percentage greater than 0 and less than 100.",
         ),
     ],
 ) -> None:
@@ -54,8 +54,8 @@ def binary(
     probability = _percentage_to_decimal(
         prob,
         name="probability",
-        allow_zero=True,
-        allow_hundred=True,
+        allow_zero=False,
+        allow_hundred=False,
     )
     try:
         prediction = storage.add_binary_prediction(question, probability)

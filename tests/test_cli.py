@@ -76,15 +76,19 @@ def test_range_command_creates_open_range_prediction():
 
 
 def test_binary_command_rejects_invalid_probability():
-    """Binary probabilities must be between 0 and 100 percent."""
+    """Binary probabilities must be greater than 0 and less than 100 percent."""
 
-    result = runner.invoke(
-        app,
-        ["binary", "Invalid probability?", "--prob", "101"],
-    )
+    for probability in ["0", "100"]:
+        result = runner.invoke(
+            app,
+            ["binary", "Invalid probability?", "--prob", probability],
+        )
 
-    assert result.exit_code == 1
-    assert "probability must be between 0 and 100 percent" in result.output
+        assert result.exit_code == 1
+        assert (
+            "probability must be greater than 0 and less than 100 percent"
+            in result.output
+        )
     assert storage.list_predictions() == []
 
 
