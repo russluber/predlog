@@ -85,6 +85,8 @@ uv run predlog stats
 
 For binary predictions, Predlog reports resolved count, mean Brier score, and directional hit rate. For range predictions, it reports resolved count, mean Winkler score, containment rate, and interval width summaries.
 
+Stats also include non-empty calibration bucket tables. These show the bucket count, observed rate, and whether the bucket is still sparse or has enough evidence according to Predlog's 5-forecast threshold.
+
 ### Generate Plots
 
 Create a binary calibration plot:
