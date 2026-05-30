@@ -16,9 +16,18 @@ import matplotlib
 matplotlib.use("Agg")
 
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
 
 from predlog import config, scoring, stats
 from predlog.models import AnyPrediction, RangePrediction
+
+
+MIN_FILLED_BUCKET_COUNT = 5
+CALIBRATION_MARKER_SIZE = 72
+MAIN_PLOT_RIGHT_EDGE = 0.74
+SIDE_PANEL_X = 0.78
+SIDE_PANEL_STATS_Y = 0.88
+SIDE_PANEL_LEGEND_Y = 0.64
 
 
 def plot_binary_calibration(
@@ -49,7 +58,7 @@ def plot_binary_calibration(
     saved_path = _resolve_output_path(output_path, config.get_binary_plot_path())
     saved_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(7, 5), dpi=150)
+    fig, ax = plt.subplots(figsize=(8.8, 5), dpi=150)
     ax.plot([0, 100], [0, 100], color="0.45", linestyle="--", label="Perfect calibration")
 
     if binary_stats.calibration_buckets:
@@ -57,17 +66,14 @@ def plot_binary_calibration(
         event_rates = [
             bucket.event_rate * 100 for bucket in binary_stats.calibration_buckets
         ]
-        point_sizes = [
-            45 + (bucket.count * 14) for bucket in binary_stats.calibration_buckets
-        ]
-        ax.scatter(bucket_labels, event_rates, s=point_sizes, color="#2563eb", zorder=3)
-        for bucket in binary_stats.calibration_buckets:
-            _annotate_bucket_count(
-                ax,
-                label=f"n={bucket.count}",
-                x_value=bucket.bucket,
-                y_value=bucket.event_rate * 100,
-            )
+        bucket_counts = [bucket.count for bucket in binary_stats.calibration_buckets]
+        _draw_bucket_markers(
+            ax,
+            x_values=bucket_labels,
+            y_values=event_rates,
+            counts=bucket_counts,
+            color="#2563eb",
+        )
 
     ax.set_title("Binary Calibration")
     ax.set_xlabel("Predicted probability bucket (%)")
@@ -77,17 +83,9 @@ def plot_binary_calibration(
     ax.set_xticks(config.BINARY_CALIBRATION_BUCKETS)
     ax.set_yticks(range(0, 101, 10))
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="lower right")
-    ax.text(
-        0.03,
-        0.97,
-        _binary_stats_text(binary_stats),
-        transform=ax.transAxes,
-        va="top",
-        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
-    )
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, MAIN_PLOT_RIGHT_EDGE, 1))
+    _add_side_panel(fig, stats_text=_binary_stats_text(binary_stats), color="#2563eb")
     fig.savefig(saved_path)
     plt.close(fig)
     return saved_path
@@ -123,20 +121,14 @@ def plot_range_diagnostics(
     saved_path = _resolve_output_path(output_path, config.get_range_plot_path())
     saved_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, axes = plt.subplots(1, 2, figsize=(11, 5), dpi=150)
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5), dpi=150)
     calibration_ax, width_ax = axes
     _draw_range_calibration_panel(calibration_ax, range_stats)
     _draw_range_width_panel(width_ax, resolved_ranges)
 
     fig.suptitle("Range Prediction Diagnostics")
-    fig.text(
-        0.5,
-        0.02,
-        _range_stats_text(range_stats),
-        ha="center",
-        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
-    )
-    fig.tight_layout(rect=(0, 0.08, 1, 0.95))
+    fig.tight_layout(rect=(0, 0.02, MAIN_PLOT_RIGHT_EDGE, 0.95))
+    _add_side_panel(fig, stats_text=_range_stats_text(range_stats), color="#16a34a")
     fig.savefig(saved_path)
     plt.close(fig)
     return saved_path
@@ -151,17 +143,14 @@ def _draw_range_calibration_panel(ax, range_stats: stats.RangeStats) -> None:
         containment_rates = [
             bucket.containment_rate * 100 for bucket in range_stats.confidence_buckets
         ]
-        point_sizes = [
-            45 + (bucket.count * 14) for bucket in range_stats.confidence_buckets
-        ]
-        ax.scatter(bucket_labels, containment_rates, s=point_sizes, color="#16a34a", zorder=3)
-        for bucket in range_stats.confidence_buckets:
-            _annotate_bucket_count(
-                ax,
-                label=f"n={bucket.count}",
-                x_value=bucket.bucket,
-                y_value=bucket.containment_rate * 100,
-            )
+        bucket_counts = [bucket.count for bucket in range_stats.confidence_buckets]
+        _draw_bucket_markers(
+            ax,
+            x_values=bucket_labels,
+            y_values=containment_rates,
+            counts=bucket_counts,
+            color="#16a34a",
+        )
 
     ax.set_title("Containment Calibration")
     ax.set_xlabel("Stated confidence bucket (%)")
@@ -171,7 +160,6 @@ def _draw_range_calibration_panel(ax, range_stats: stats.RangeStats) -> None:
     ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
     ax.set_yticks(range(0, 101, 10))
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="lower right")
 
 
 def _draw_range_width_panel(
@@ -232,25 +220,101 @@ def _resolve_output_path(output_path: Path | str | None, default_path: Path) -> 
     return Path(output_path).expanduser()
 
 
-def _annotate_bucket_count(ax, *, label: str, x_value: float, y_value: float) -> None:
-    """Annotate a calibration bucket count without crossing the plot boundary."""
+def _add_side_panel(fig, *, stats_text: str, color: str) -> None:
+    """Draw calibration summary and marker legend outside the plot axes."""
 
-    if y_value >= 95:
-        offset = (0, -10)
-        vertical_alignment = "top"
-    else:
-        offset = (0, 8)
-        vertical_alignment = "bottom"
-
-    ax.annotate(
-        label,
-        (x_value, y_value),
-        textcoords="offset points",
-        xytext=offset,
-        ha="center",
-        va=vertical_alignment,
-        fontsize=8,
+    fig.text(
+        SIDE_PANEL_X,
+        SIDE_PANEL_STATS_Y,
+        stats_text,
+        ha="left",
+        va="top",
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
     )
+    fig.legend(
+        handles=_calibration_legend_handles(color),
+        loc="upper left",
+        bbox_to_anchor=(SIDE_PANEL_X, SIDE_PANEL_LEGEND_Y),
+        borderaxespad=0,
+        frameon=True,
+    )
+
+
+def _draw_bucket_markers(
+    ax,
+    *,
+    x_values: list[int],
+    y_values: list[float],
+    counts: list[int],
+    color: str,
+) -> None:
+    """Draw fixed-size calibration markers, hollowing buckets with little data."""
+
+    sparse_points = [
+        (x_value, y_value)
+        for x_value, y_value, count in zip(x_values, y_values, counts, strict=True)
+        if count < MIN_FILLED_BUCKET_COUNT
+    ]
+    filled_points = [
+        (x_value, y_value)
+        for x_value, y_value, count in zip(x_values, y_values, counts, strict=True)
+        if count >= MIN_FILLED_BUCKET_COUNT
+    ]
+
+    if sparse_points:
+        ax.scatter(
+            [point[0] for point in sparse_points],
+            [point[1] for point in sparse_points],
+            s=CALIBRATION_MARKER_SIZE,
+            facecolors="none",
+            edgecolors=color,
+            linewidths=1.8,
+            zorder=3,
+        )
+    if filled_points:
+        ax.scatter(
+            [point[0] for point in filled_points],
+            [point[1] for point in filled_points],
+            s=CALIBRATION_MARKER_SIZE,
+            facecolors=color,
+            edgecolors=color,
+            linewidths=1.8,
+            zorder=3,
+        )
+
+
+def _calibration_legend_handles(color: str) -> list[Line2D]:
+    """Return legend handles for calibration reference and bucket evidence."""
+
+    return [
+        Line2D(
+            [],
+            [],
+            color="0.45",
+            linestyle="--",
+            label="Perfect calibration",
+        ),
+        Line2D(
+            [],
+            [],
+            marker="o",
+            markerfacecolor="none",
+            markeredgecolor=color,
+            markeredgewidth=1.8,
+            linestyle="None",
+            label=f"<{MIN_FILLED_BUCKET_COUNT} in bucket",
+        ),
+        Line2D(
+            [],
+            [],
+            marker="o",
+            markerfacecolor=color,
+            markeredgecolor=color,
+            markeredgewidth=1.8,
+            linestyle="None",
+            label=f">={MIN_FILLED_BUCKET_COUNT} in bucket",
+        ),
+    ]
 
 
 def _binary_stats_text(binary_stats: stats.BinaryStats) -> str:
@@ -266,8 +330,8 @@ def _range_stats_text(range_stats: stats.RangeStats) -> str:
     """Return text-box content for the range diagnostics plot."""
 
     return (
-        f"Resolved: {range_stats.resolved_count}   "
-        f"Mean Winkler: {_format_optional_score(range_stats.mean_winkler_score)}   "
+        f"Resolved: {range_stats.resolved_count}\n"
+        f"Mean Winkler: {_format_optional_score(range_stats.mean_winkler_score)}\n"
         f"Containment: {_format_optional_rate(range_stats.containment_rate)}"
     )
 
