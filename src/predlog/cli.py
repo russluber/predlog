@@ -1,0 +1,420 @@
+"""Command line interface for Predlog.
+
+The CLI layer is responsible for parsing terminal commands, validating
+user-facing percentage arguments, calling storage, and printing readable output.
+It deliberately does not contain SQL or scoring formulas; those stay in
+``storage.py`` and ``scoring.py``.
+"""
+
+from __future__ import annotations
+
+import math
+from pathlib import Path
+from typing import Annotated
+
+from rich.console import Console
+from rich.markup import escape
+from rich.table import Table
+import typer
+
+from predlog import config, scoring, storage
+from predlog.models import (
+    OPEN_STATUS,
+    RESOLVED_STATUS,
+    AnyPrediction,
+    BinaryPrediction,
+    PredictionStatus,
+    RangePrediction,
+)
+
+app = typer.Typer(
+    help="A local-first prediction journal for personal calibration tracking.",
+    no_args_is_help=True,
+)
+console = Console(highlight=False, width=160)
+
+
+@app.command()
+def binary(
+    question: Annotated[
+        str,
+        typer.Argument(help="The yes/no prediction question to log."),
+    ],
+    prob: Annotated[
+        float,
+        typer.Option(
+            ...,
+            "--prob",
+            help="Forecast probability as a percentage from 0 to 100.",
+        ),
+    ],
+) -> None:
+    """Log a binary yes/no prediction."""
+
+    probability = _percentage_to_decimal(
+        prob,
+        name="probability",
+        allow_zero=True,
+        allow_hundred=True,
+    )
+    try:
+        prediction = storage.add_binary_prediction(question, probability)
+    except ValueError as error:
+        _fail(str(error))
+
+    console.print("[green]Logged binary prediction[/green]")
+    console.print(f"ID: {prediction.id}")
+    console.print(f"Question: {escape(prediction.question)}")
+    console.print(f"Forecast: {_format_percent(prediction.probability)}")
+
+
+@app.command("range")
+def range_command(
+    question: Annotated[
+        str,
+        typer.Argument(help="The numerical range prediction question to log."),
+    ],
+    low: Annotated[
+        float,
+        typer.Option(..., "--low", help="Lower bound of the forecast interval."),
+    ],
+    high: Annotated[
+        float,
+        typer.Option(..., "--high", help="Upper bound of the forecast interval."),
+    ],
+    conf: Annotated[
+        float,
+        typer.Option(
+            ...,
+            "--conf",
+            help="Interval confidence as a percentage greater than 0 and less than 100.",
+        ),
+    ],
+) -> None:
+    """Log a numerical range prediction."""
+
+    confidence = _percentage_to_decimal(
+        conf,
+        name="confidence",
+        allow_zero=False,
+        allow_hundred=False,
+    )
+    try:
+        prediction = storage.add_range_prediction(question, low, high, confidence)
+    except ValueError as error:
+        _fail(str(error))
+
+    console.print("[green]Logged range prediction[/green]")
+    console.print(f"ID: {prediction.id}")
+    console.print(f"Question: {escape(prediction.question)}")
+    console.print(
+        "Interval: "
+        f"{_format_interval(prediction.lower, prediction.upper)} "
+        f"at {_format_percent(prediction.confidence)} confidence"
+    )
+
+
+@app.command("list")
+def list_command(
+    status: Annotated[
+        str | None,
+        typer.Argument(help="Optional filter: open or resolved."),
+    ] = None,
+) -> None:
+    """List logged predictions."""
+
+    normalized_status = _normalize_status_filter(status)
+    predictions = storage.list_predictions(normalized_status)
+    if not predictions:
+        console.print(_empty_list_message(normalized_status))
+        return
+
+    table = Table(title=_list_title(normalized_status))
+    table.add_column("ID", justify="right")
+    table.add_column("Status")
+    table.add_column("Type")
+    table.add_column("Question", overflow="fold")
+    table.add_column("Forecast", overflow="fold")
+    table.add_column("Result")
+    table.add_column("Created")
+    table.add_column("Resolved")
+
+    for prediction in predictions:
+        table.add_row(
+            str(prediction.id),
+            prediction.status,
+            prediction.kind,
+            escape(prediction.question),
+            _format_forecast(prediction),
+            _format_result(prediction),
+            _format_date(prediction.created_at),
+            _format_optional_date(prediction.resolved_at),
+        )
+
+    console.print(table)
+
+
+@app.command()
+def resolve() -> None:
+    """Resolve one open prediction interactively."""
+
+    open_predictions = storage.list_open_predictions()
+    if not open_predictions:
+        console.print("No open predictions to resolve.")
+        return
+
+    _print_open_prediction_menu(open_predictions)
+    selected_prediction = _choose_prediction(open_predictions)
+
+    if isinstance(selected_prediction, BinaryPrediction):
+        _resolve_binary_interactively(selected_prediction)
+        return
+    _resolve_range_interactively(selected_prediction)
+
+
+@app.command()
+def where() -> None:
+    """Show the local paths Predlog uses for data and generated plots."""
+
+    console.print("[bold]Predlog paths[/bold]")
+    console.print(f"Home: {_format_path(config.get_predlog_home())}")
+    console.print(f"Database: {_format_path(config.get_database_path())}")
+    console.print(f"Plots: {_format_path(config.get_plots_dir())}")
+    console.print(f"Binary plot: {_format_path(config.get_binary_plot_path())}")
+    console.print(f"Range plot: {_format_path(config.get_range_plot_path())}")
+
+
+def _resolve_binary_interactively(prediction: BinaryPrediction) -> None:
+    """Prompt for a binary outcome, resolve it, and print scoring feedback."""
+
+    outcome = _prompt_yes_no("Did it happen? yes/no")
+    try:
+        resolved = storage.resolve_binary_prediction(prediction.id, outcome)
+    except (storage.StorageError, ValueError) as error:
+        _fail(str(error))
+
+    assert resolved.outcome is not None
+    score = scoring.brier_score(resolved.probability, resolved.outcome)
+
+    console.print(f"Resolved: {escape(resolved.question)}")
+    console.print(f"Outcome: {_format_binary_outcome(resolved.outcome)}")
+    console.print(f"Brier score: {score:.3f}")
+
+
+def _resolve_range_interactively(prediction: RangePrediction) -> None:
+    """Prompt for a numerical actual value, resolve it, and print feedback."""
+
+    actual = _prompt_finite_float("Actual value")
+    try:
+        resolved = storage.resolve_range_prediction(prediction.id, actual)
+    except (storage.StorageError, ValueError) as error:
+        _fail(str(error))
+
+    assert resolved.actual is not None
+    is_contained = scoring.contained(resolved.lower, resolved.upper, resolved.actual)
+    score = scoring.winkler_score(
+        resolved.lower,
+        resolved.upper,
+        resolved.confidence,
+        resolved.actual,
+    )
+
+    console.print(f"Resolved: {escape(resolved.question)}")
+    console.print(f"Actual value: {_format_number(resolved.actual)}")
+    console.print(f"Contained in interval: {_format_bool(is_contained)}")
+    console.print(f"Winkler score: {score:.3f}")
+
+
+def _print_open_prediction_menu(predictions: list[AnyPrediction]) -> None:
+    """Print the temporary menu labels used by interactive resolution."""
+
+    console.print("[bold]Open predictions[/bold]")
+    console.print()
+    for index, prediction in enumerate(predictions, start=1):
+        console.print(f"[{index}] {escape(prediction.question)}")
+        console.print(f"    Type: {prediction.kind}")
+        if isinstance(prediction, BinaryPrediction):
+            console.print(f"    Forecast: {_format_percent(prediction.probability)}")
+        else:
+            console.print(f"    Interval: {_format_interval(prediction.lower, prediction.upper)}")
+            console.print(f"    Confidence: {_format_percent(prediction.confidence)}")
+        console.print(f"    Created: {_format_date(prediction.created_at)}")
+        console.print()
+
+
+def _choose_prediction(predictions: list[AnyPrediction]) -> AnyPrediction:
+    """Prompt for and return the selected prediction from an open menu."""
+
+    selection = typer.prompt("Choose a prediction to resolve")
+    try:
+        index = int(selection)
+    except ValueError:
+        _fail(f"Choose a number from 1 to {len(predictions)}.")
+
+    if not 1 <= index <= len(predictions):
+        _fail(f"Choose a number from 1 to {len(predictions)}.")
+    return predictions[index - 1]
+
+
+def _prompt_yes_no(prompt: str) -> int:
+    """Prompt until the user enters yes or no, returning 1 for yes and 0 for no."""
+
+    while True:
+        answer = typer.prompt(prompt).strip().lower()
+        if answer in {"yes", "y"}:
+            return 1
+        if answer in {"no", "n"}:
+            return 0
+        console.print("[red]Please enter yes or no.[/red]")
+
+
+def _prompt_finite_float(prompt: str) -> float:
+    """Prompt until the user enters a finite number."""
+
+    while True:
+        value_text = typer.prompt(prompt)
+        try:
+            value = float(value_text)
+        except ValueError:
+            console.print("[red]Please enter a number.[/red]")
+            continue
+        if math.isfinite(value):
+            return value
+        console.print("[red]Please enter a finite number.[/red]")
+
+
+def _percentage_to_decimal(
+    value: float,
+    *,
+    name: str,
+    allow_zero: bool,
+    allow_hundred: bool,
+) -> float:
+    """Validate a user-facing percentage and return its decimal value."""
+
+    if not math.isfinite(value):
+        _fail(f"{name} must be a finite percentage.")
+    lower_ok = value >= 0 if allow_zero else value > 0
+    upper_ok = value <= 100 if allow_hundred else value < 100
+    if not lower_ok or not upper_ok:
+        if allow_zero and allow_hundred:
+            _fail(f"{name} must be between 0 and 100 percent.")
+        _fail(f"{name} must be greater than 0 and less than 100 percent.")
+    return value / 100
+
+
+def _normalize_status_filter(status: str | None) -> PredictionStatus | None:
+    """Normalize the optional list status argument."""
+
+    if status is None:
+        return None
+    normalized = status.lower()
+    if normalized == OPEN_STATUS:
+        return OPEN_STATUS
+    if normalized == RESOLVED_STATUS:
+        return RESOLVED_STATUS
+    _fail("Status must be 'open' or 'resolved'.")
+
+
+def _empty_list_message(status: PredictionStatus | None) -> str:
+    """Return the empty-state message for a list command."""
+
+    if status == OPEN_STATUS:
+        return "No open predictions."
+    if status == RESOLVED_STATUS:
+        return "No resolved predictions."
+    return "No predictions yet."
+
+
+def _list_title(status: PredictionStatus | None) -> str:
+    """Return the table title for a list command."""
+
+    if status == OPEN_STATUS:
+        return "Open predictions"
+    if status == RESOLVED_STATUS:
+        return "Resolved predictions"
+    return "Predictions"
+
+
+def _format_forecast(prediction: AnyPrediction) -> str:
+    """Return a compact forecast summary for list output."""
+
+    if isinstance(prediction, BinaryPrediction):
+        return _format_percent(prediction.probability)
+    return (
+        f"{_format_interval(prediction.lower, prediction.upper)} "
+        f"@ {_format_percent(prediction.confidence)}"
+    )
+
+
+def _format_result(prediction: AnyPrediction) -> str:
+    """Return a compact result summary for list output."""
+
+    if isinstance(prediction, BinaryPrediction):
+        if prediction.outcome is None:
+            return "-"
+        return _format_binary_outcome(prediction.outcome)
+    if prediction.actual is None:
+        return "-"
+    return _format_number(prediction.actual)
+
+
+def _format_binary_outcome(outcome: int) -> str:
+    """Return yes/no display text for a stored binary outcome."""
+
+    return "yes" if outcome == 1 else "no"
+
+
+def _format_bool(value: bool) -> str:
+    """Return yes/no display text for a boolean diagnostic."""
+
+    return "yes" if value else "no"
+
+
+def _format_percent(decimal_value: float) -> str:
+    """Format a decimal probability or confidence as a percentage."""
+
+    return f"{_format_number(decimal_value * 100)} percent"
+
+
+def _format_interval(lower: float, upper: float) -> str:
+    """Format an interval as ``[lower, upper]``."""
+
+    return f"[{_format_number(lower)}, {_format_number(upper)}]"
+
+
+def _format_number(value: float) -> str:
+    """Format a number compactly for terminal output."""
+
+    return f"{value:g}"
+
+
+def _format_date(value) -> str:
+    """Format a timestamp as a date for compact terminal output."""
+
+    return value.date().isoformat()
+
+
+def _format_optional_date(value) -> str:
+    """Format an optional timestamp for compact terminal output."""
+
+    if value is None:
+        return "-"
+    return _format_date(value)
+
+
+def _format_path(path: Path) -> str:
+    """Return escaped path text for Rich table output."""
+
+    return escape(str(path))
+
+
+def _fail(message: str) -> None:
+    """Print a friendly error message and exit the CLI command."""
+
+    console.print(f"[red]Error:[/red] {escape(message)}")
+    raise typer.Exit(code=1)
+
+
+if __name__ == "__main__":
+    app()

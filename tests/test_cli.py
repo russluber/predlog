@@ -1,0 +1,270 @@
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from predlog import config, storage
+from predlog.cli import app
+from predlog.models import OPEN_STATUS, RESOLVED_STATUS, BinaryPrediction, RangePrediction
+
+
+runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def isolated_predlog_home(monkeypatch, tmp_path):
+    """Point every CLI test at an isolated Predlog data directory."""
+
+    predlog_home = tmp_path / "predlog-home"
+    monkeypatch.setenv(config.PREDLOG_HOME_ENV, str(predlog_home))
+    return predlog_home
+
+
+def test_binary_command_creates_open_binary_prediction():
+    """The binary command stores a probability entered as a percentage."""
+
+    result = runner.invoke(
+        app,
+        ["binary", "Will it rain tomorrow?", "--prob", "30"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Logged binary prediction" in result.output
+    assert "Will it rain tomorrow?" in result.output
+    assert "30 percent" in result.output
+
+    predictions = storage.list_open_predictions()
+    assert len(predictions) == 1
+    prediction = predictions[0]
+    assert isinstance(prediction, BinaryPrediction)
+    assert prediction.question == "Will it rain tomorrow?"
+    assert prediction.probability == pytest.approx(0.30)
+    assert prediction.status == OPEN_STATUS
+
+
+def test_range_command_creates_open_range_prediction():
+    """The range command stores confidence entered as a percentage."""
+
+    result = runner.invoke(
+        app,
+        [
+            "range",
+            "How many hours will this project take?",
+            "--low",
+            "5",
+            "--high",
+            "12",
+            "--conf",
+            "80",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Logged range prediction" in result.output
+    assert "How many hours will this project take?" in result.output
+    assert "[5, 12]" in result.output
+    assert "80 percent" in result.output
+
+    predictions = storage.list_open_predictions()
+    assert len(predictions) == 1
+    prediction = predictions[0]
+    assert isinstance(prediction, RangePrediction)
+    assert prediction.lower == pytest.approx(5.0)
+    assert prediction.upper == pytest.approx(12.0)
+    assert prediction.confidence == pytest.approx(0.80)
+    assert prediction.status == OPEN_STATUS
+
+
+def test_binary_command_rejects_invalid_probability():
+    """Binary probabilities must be between 0 and 100 percent."""
+
+    result = runner.invoke(
+        app,
+        ["binary", "Invalid probability?", "--prob", "101"],
+    )
+
+    assert result.exit_code == 1
+    assert "probability must be between 0 and 100 percent" in result.output
+    assert storage.list_predictions() == []
+
+
+def test_range_command_rejects_invalid_confidence():
+    """Range confidence must be greater than 0 and less than 100 percent."""
+
+    result = runner.invoke(
+        app,
+        [
+            "range",
+            "Invalid confidence?",
+            "--low",
+            "5",
+            "--high",
+            "12",
+            "--conf",
+            "100",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "confidence must be greater than 0 and less than 100 percent" in result.output
+    assert storage.list_predictions() == []
+
+
+def test_range_command_rejects_invalid_bounds():
+    """Range lower bounds must be strictly less than upper bounds."""
+
+    result = runner.invoke(
+        app,
+        [
+            "range",
+            "Invalid interval?",
+            "--low",
+            "12",
+            "--high",
+            "5",
+            "--conf",
+            "80",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "interval lower bound must be less than upper bound" in result.output
+    assert storage.list_predictions() == []
+
+
+def test_list_command_shows_all_open_and_resolved_predictions():
+    """The list command can show all, open, or resolved predictions."""
+
+    binary = storage.add_binary_prediction("Open binary?", 0.60)
+    resolved_range = storage.add_range_prediction("Resolved range?", 5.0, 12.0, 0.80)
+    storage.resolve_range_prediction(resolved_range.id, 9.5)
+
+    all_result = runner.invoke(app, ["list"])
+    open_result = runner.invoke(app, ["list", "open"])
+    resolved_result = runner.invoke(app, ["list", "resolved"])
+
+    assert all_result.exit_code == 0, all_result.output
+    assert "Open binary?" in all_result.output
+    assert "Resolved range?" in all_result.output
+    assert str(binary.id) in all_result.output
+
+    assert open_result.exit_code == 0, open_result.output
+    assert "Open binary?" in open_result.output
+    assert "Resolved range?" not in open_result.output
+
+    assert resolved_result.exit_code == 0, resolved_result.output
+    assert "Resolved range?" in resolved_result.output
+    assert "Open binary?" not in resolved_result.output
+    assert RESOLVED_STATUS in resolved_result.output
+
+
+def test_list_command_empty_states():
+    """The list command prints friendly empty messages."""
+
+    all_result = runner.invoke(app, ["list"])
+    open_result = runner.invoke(app, ["list", "open"])
+    resolved_result = runner.invoke(app, ["list", "resolved"])
+
+    assert all_result.exit_code == 0
+    assert "No predictions yet." in all_result.output
+    assert open_result.exit_code == 0
+    assert "No open predictions." in open_result.output
+    assert resolved_result.exit_code == 0
+    assert "No resolved predictions." in resolved_result.output
+
+
+def test_list_command_rejects_unknown_status():
+    """The list command only accepts open and resolved filters."""
+
+    result = runner.invoke(app, ["list", "pending"])
+
+    assert result.exit_code == 1
+    assert "Status must be 'open' or 'resolved'." in result.output
+
+
+def test_resolve_command_resolves_binary_prediction_interactively():
+    """Interactive binary resolution prints immediate Brier feedback."""
+
+    prediction = storage.add_binary_prediction("Will it rain tomorrow?", 0.70)
+
+    result = runner.invoke(app, ["resolve"], input="1\nyes\n")
+
+    assert result.exit_code == 0, result.output
+    assert "[1] Will it rain tomorrow?" in result.output
+    assert "Outcome: yes" in result.output
+    assert "Brier score: 0.090" in result.output
+
+    resolved_predictions = storage.list_resolved_predictions()
+    assert len(resolved_predictions) == 1
+    resolved = resolved_predictions[0]
+    assert resolved.id == prediction.id
+    assert isinstance(resolved, BinaryPrediction)
+    assert resolved.outcome == 1
+    assert resolved.status == RESOLVED_STATUS
+
+
+def test_resolve_command_resolves_range_prediction_interactively():
+    """Interactive range resolution prints containment and Winkler feedback."""
+
+    prediction = storage.add_range_prediction(
+        "How many hours will this project take?",
+        5.0,
+        12.0,
+        0.80,
+    )
+
+    result = runner.invoke(app, ["resolve"], input="1\n9.5\n")
+
+    assert result.exit_code == 0, result.output
+    assert "[1] How many hours will this project take?" in result.output
+    assert "Actual value: 9.5" in result.output
+    assert "Contained in interval: yes" in result.output
+    assert "Winkler score: 7.000" in result.output
+
+    resolved_predictions = storage.list_resolved_predictions()
+    assert len(resolved_predictions) == 1
+    resolved = resolved_predictions[0]
+    assert resolved.id == prediction.id
+    assert isinstance(resolved, RangePrediction)
+    assert resolved.actual == pytest.approx(9.5)
+    assert resolved.status == RESOLVED_STATUS
+
+
+def test_resolve_command_handles_no_open_predictions():
+    """Resolve exits cleanly when there are no open predictions."""
+
+    result = runner.invoke(app, ["resolve"])
+
+    assert result.exit_code == 0
+    assert "No open predictions to resolve." in result.output
+
+
+def test_where_command_respects_predlog_home(isolated_predlog_home):
+    """The where command shows paths derived from PREDLOG_HOME."""
+
+    result = runner.invoke(app, ["where"])
+
+    assert result.exit_code == 0, result.output
+    assert str(isolated_predlog_home) in result.output
+    assert str(isolated_predlog_home / "predlog.db") in result.output
+    assert str(isolated_predlog_home / "plots") in result.output
+    assert "binary_calibration.png" in result.output
+    assert "range_diagnostics.png" in result.output
+
+
+def test_cli_help_runs():
+    """The Typer app exposes command help."""
+
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "prediction journal" in result.output
+
+
+def test_where_command_does_not_create_database(isolated_predlog_home):
+    """Showing paths does not initialize local storage."""
+
+    result = runner.invoke(app, ["where"])
+
+    assert result.exit_code == 0, result.output
+    assert not Path(isolated_predlog_home / "predlog.db").exists()
