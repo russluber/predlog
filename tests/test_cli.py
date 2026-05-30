@@ -234,6 +234,110 @@ def test_resolve_command_resolves_range_prediction_interactively():
     assert resolved.status == RESOLVED_STATUS
 
 
+def test_resolve_command_resolves_binary_prediction_directly_with_yes():
+    """Direct binary resolution avoids the interactive menu."""
+
+    prediction = storage.add_binary_prediction("Will it rain tomorrow?", 0.70)
+
+    result = runner.invoke(app, ["resolve", str(prediction.id), "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "Resolved: Will it rain tomorrow?" in result.output
+    assert "Outcome: yes" in result.output
+    assert "Brier score: 0.090" in result.output
+    assert "[1] Will it rain tomorrow?" not in result.output
+
+    resolved = storage.list_resolved_predictions()[0]
+    assert isinstance(resolved, BinaryPrediction)
+    assert resolved.id == prediction.id
+    assert resolved.outcome == 1
+
+
+def test_resolve_command_resolves_binary_prediction_directly_with_no():
+    """Direct binary resolution supports no outcomes."""
+
+    prediction = storage.add_binary_prediction("Will it rain tomorrow?", 0.30)
+
+    result = runner.invoke(app, ["resolve", str(prediction.id), "--no"])
+
+    assert result.exit_code == 0, result.output
+    assert "Outcome: no" in result.output
+    assert "Brier score: 0.090" in result.output
+
+    resolved = storage.list_resolved_predictions()[0]
+    assert isinstance(resolved, BinaryPrediction)
+    assert resolved.outcome == 0
+
+
+def test_resolve_command_resolves_range_prediction_directly_with_actual():
+    """Direct range resolution accepts an actual value."""
+
+    prediction = storage.add_range_prediction(
+        "How many hours will this project take?",
+        5.0,
+        12.0,
+        0.80,
+    )
+
+    result = runner.invoke(app, ["resolve", str(prediction.id), "--actual", "9.5"])
+
+    assert result.exit_code == 0, result.output
+    assert "Resolved: How many hours will this project take?" in result.output
+    assert "Actual value: 9.5" in result.output
+    assert "Contained in interval: yes" in result.output
+    assert "Winkler score: 7.000" in result.output
+
+    resolved = storage.list_resolved_predictions()[0]
+    assert isinstance(resolved, RangePrediction)
+    assert resolved.id == prediction.id
+    assert resolved.actual == pytest.approx(9.5)
+
+
+def test_resolve_command_rejects_direct_options_without_id():
+    """Fast resolve options require an explicit prediction ID."""
+
+    result = runner.invoke(app, ["resolve", "--yes"])
+
+    assert result.exit_code == 1
+    assert "Pass a prediction ID" in result.output
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["resolve", "1"],
+        ["resolve", "1", "--yes", "--no"],
+        ["resolve", "1", "--yes", "--actual", "9.5"],
+    ],
+)
+def test_resolve_command_rejects_invalid_direct_option_combinations(args):
+    """Direct resolve mode rejects ambiguous or incomplete options."""
+
+    result = runner.invoke(app, args)
+
+    assert result.exit_code == 1
+
+
+def test_resolve_command_rejects_wrong_direct_resolver_for_prediction_kind():
+    """Direct resolve mode reports kind mismatches cleanly."""
+
+    binary = storage.add_binary_prediction("Will it rain tomorrow?", 0.70)
+    range_prediction = storage.add_range_prediction(
+        "How many hours will this project take?",
+        5.0,
+        12.0,
+        0.80,
+    )
+
+    binary_result = runner.invoke(app, ["resolve", str(binary.id), "--actual", "9.5"])
+    range_result = runner.invoke(app, ["resolve", str(range_prediction.id), "--yes"])
+
+    assert binary_result.exit_code == 1
+    assert "is binary, not range" in binary_result.output
+    assert range_result.exit_code == 1
+    assert "is range, not binary" in range_result.output
+
+
 def test_resolve_command_handles_no_open_predictions():
     """Resolve exits cleanly when there are no open predictions."""
 

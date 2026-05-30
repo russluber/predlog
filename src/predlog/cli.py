@@ -157,8 +157,40 @@ def list_command(
 
 
 @app.command()
-def resolve() -> None:
-    """Resolve one open prediction interactively."""
+def resolve(
+    prediction_id: Annotated[
+        int | None,
+        typer.Argument(
+            help="Optional database ID to resolve directly. Omit for interactive mode.",
+        ),
+    ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", help="Resolve a binary prediction as yes."),
+    ] = False,
+    no: Annotated[
+        bool,
+        typer.Option("--no", help="Resolve a binary prediction as no."),
+    ] = False,
+    actual: Annotated[
+        float | None,
+        typer.Option("--actual", help="Resolve a range prediction with this value."),
+    ] = None,
+) -> None:
+    """Resolve one open prediction."""
+
+    if prediction_id is not None:
+        _resolve_direct(prediction_id, yes=yes, no=no, actual=actual)
+        return
+
+    if yes or no or actual is not None:
+        _fail("Pass a prediction ID when using --yes, --no, or --actual.")
+
+    _resolve_interactively()
+
+
+def _resolve_interactively() -> None:
+    """Run the interactive resolution menu."""
 
     open_predictions = storage.list_open_predictions()
     if not open_predictions:
@@ -230,6 +262,48 @@ def plot_range_command() -> None:
     console.print(f"Saved range diagnostics plot: {_format_path(saved_path)}")
 
 
+def _resolve_direct(
+    prediction_id: int,
+    *,
+    yes: bool,
+    no: bool,
+    actual: float | None,
+) -> None:
+    """Resolve one prediction directly from command options."""
+
+    if yes and no:
+        _fail("Use either --yes or --no, not both.")
+    if actual is not None and (yes or no):
+        _fail("Use --actual for range predictions or --yes/--no for binary predictions.")
+    if yes or no:
+        _resolve_binary_direct(prediction_id, 1 if yes else 0)
+        return
+    if actual is not None:
+        _resolve_range_direct(prediction_id, actual)
+        return
+    _fail("Provide --yes, --no, or --actual when resolving by ID.")
+
+
+def _resolve_binary_direct(prediction_id: int, outcome: int) -> None:
+    """Resolve a binary prediction by permanent database ID."""
+
+    try:
+        resolved = storage.resolve_binary_prediction(prediction_id, outcome)
+    except (storage.StorageError, ValueError) as error:
+        _fail(str(error))
+    _print_binary_resolution_feedback(resolved)
+
+
+def _resolve_range_direct(prediction_id: int, actual: float) -> None:
+    """Resolve a range prediction by permanent database ID."""
+
+    try:
+        resolved = storage.resolve_range_prediction(prediction_id, actual)
+    except (storage.StorageError, ValueError) as error:
+        _fail(str(error))
+    _print_range_resolution_feedback(resolved)
+
+
 def _resolve_binary_interactively(prediction: BinaryPrediction) -> None:
     """Prompt for a binary outcome, resolve it, and print scoring feedback."""
 
@@ -238,6 +312,12 @@ def _resolve_binary_interactively(prediction: BinaryPrediction) -> None:
         resolved = storage.resolve_binary_prediction(prediction.id, outcome)
     except (storage.StorageError, ValueError) as error:
         _fail(str(error))
+
+    _print_binary_resolution_feedback(resolved)
+
+
+def _print_binary_resolution_feedback(resolved: BinaryPrediction) -> None:
+    """Print scoring feedback for a resolved binary prediction."""
 
     assert resolved.outcome is not None
     score = scoring.brier_score(resolved.probability, resolved.outcome)
@@ -255,6 +335,12 @@ def _resolve_range_interactively(prediction: RangePrediction) -> None:
         resolved = storage.resolve_range_prediction(prediction.id, actual)
     except (storage.StorageError, ValueError) as error:
         _fail(str(error))
+
+    _print_range_resolution_feedback(resolved)
+
+
+def _print_range_resolution_feedback(resolved: RangePrediction) -> None:
+    """Print scoring feedback for a resolved range prediction."""
 
     assert resolved.actual is not None
     is_contained = scoring.contained(resolved.lower, resolved.upper, resolved.actual)
