@@ -32,10 +32,10 @@ BINARY_CALIBRATION_PLOT_FILENAME = "binary_calibration.png"
 RANGE_DIAGNOSTICS_PLOT_FILENAME = "range_diagnostics.png"
 """Default filename for the range diagnostics plot."""
 
-BINARY_CALIBRATION_BUCKETS = tuple(range(0, 101, 10))
+BINARY_CALIBRATION_BUCKETS = tuple(range(10, 100, 10))
 """Default percentage buckets for binary calibration summaries and plots."""
 
-RANGE_CONFIDENCE_BUCKETS = tuple(range(0, 101, 10))
+RANGE_CONFIDENCE_BUCKETS = tuple(range(10, 100, 10))
 """Default percentage buckets for range confidence calibration summaries."""
 
 

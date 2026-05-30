@@ -243,6 +243,44 @@ def test_resolve_command_handles_no_open_predictions():
     assert "No open predictions to resolve." in result.output
 
 
+def test_stats_command_handles_no_resolved_predictions():
+    """Stats exits cleanly when there is no resolved data yet."""
+
+    result = runner.invoke(app, ["stats"])
+
+    assert result.exit_code == 0
+    assert "No resolved binary predictions yet." in result.output
+    assert "No resolved range predictions yet." in result.output
+
+
+def test_stats_command_summarizes_resolved_predictions():
+    """Stats prints binary and range summaries from resolved predictions."""
+
+    binary = storage.add_binary_prediction("Will it rain tomorrow?", 0.70)
+    range_prediction = storage.add_range_prediction(
+        "How many hours will this project take?",
+        80.0,
+        120.0,
+        0.80,
+    )
+    storage.resolve_binary_prediction(binary.id, 1)
+    storage.resolve_range_prediction(range_prediction.id, 100.0)
+
+    result = runner.invoke(app, ["stats"])
+
+    assert result.exit_code == 0, result.output
+    assert "Binary predictions" in result.output
+    assert "Resolved: 1" in result.output
+    assert "Mean Brier score: 0.090" in result.output
+    assert "Directional hit rate: 100.0 percent" in result.output
+    assert "Range predictions" in result.output
+    assert "Mean Winkler score: 40.000" in result.output
+    assert "Containment rate: 100.0 percent" in result.output
+    assert "Range interval width" in result.output
+    assert "Average width: 40" in result.output
+    assert "Average relative width: 40.0 percent" in result.output
+
+
 def test_where_command_respects_predlog_home(isolated_predlog_home):
     """The where command shows paths derived from PREDLOG_HOME."""
 

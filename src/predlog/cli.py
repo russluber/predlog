@@ -17,7 +17,7 @@ from rich.markup import escape
 from rich.table import Table
 import typer
 
-from predlog import config, scoring, storage
+from predlog import config, scoring, stats as stats_module, storage
 from predlog.models import (
     OPEN_STATUS,
     RESOLVED_STATUS,
@@ -173,6 +173,18 @@ def resolve() -> None:
 
 
 @app.command()
+def stats() -> None:
+    """Show scoring and calibration summaries for resolved predictions."""
+
+    prediction_stats = stats_module.summarize_predictions(
+        storage.load_resolved_predictions()
+    )
+    _print_binary_stats(prediction_stats.binary)
+    console.print()
+    _print_range_stats(prediction_stats.range)
+
+
+@app.command()
 def where() -> None:
     """Show the local paths Predlog uses for data and generated plots."""
 
@@ -223,6 +235,49 @@ def _resolve_range_interactively(prediction: RangePrediction) -> None:
     console.print(f"Actual value: {_format_number(resolved.actual)}")
     console.print(f"Contained in interval: {_format_bool(is_contained)}")
     console.print(f"Winkler score: {score:.3f}")
+
+
+def _print_binary_stats(binary_stats: stats_module.BinaryStats) -> None:
+    """Print terminal summaries for resolved binary predictions."""
+
+    if binary_stats.resolved_count == 0:
+        console.print("No resolved binary predictions yet.")
+        return
+
+    console.print("[bold]Binary predictions[/bold]")
+    console.print(f"Resolved: {binary_stats.resolved_count}")
+    console.print(
+        f"Mean Brier score: {_format_optional_score(binary_stats.mean_brier_score)}"
+    )
+    if binary_stats.directional_hit_rate is None:
+        console.print("Directional hit rate: n/a")
+    else:
+        console.print(
+            "Directional hit rate: "
+            f"{_format_rate(binary_stats.directional_hit_rate)}"
+        )
+
+
+def _print_range_stats(range_stats: stats_module.RangeStats) -> None:
+    """Print terminal summaries for resolved range predictions."""
+
+    if range_stats.resolved_count == 0:
+        console.print("No resolved range predictions yet.")
+        return
+
+    console.print("[bold]Range predictions[/bold]")
+    console.print(f"Resolved: {range_stats.resolved_count}")
+    console.print(
+        f"Mean Winkler score: {_format_optional_score(range_stats.mean_winkler_score)}"
+    )
+    console.print(f"Containment rate: {_format_optional_rate(range_stats.containment_rate)}")
+    console.print()
+    console.print("[bold]Range interval width[/bold]")
+    console.print(f"Average width: {_format_optional_number(range_stats.average_width)}")
+    console.print(
+        "Average relative width: "
+        f"{_format_optional_rate(range_stats.average_relative_width)}"
+    )
 
 
 def _print_open_prediction_menu(predictions: list[AnyPrediction]) -> None:
@@ -387,6 +442,36 @@ def _format_number(value: float) -> str:
     """Format a number compactly for terminal output."""
 
     return f"{value:g}"
+
+
+def _format_rate(value: float) -> str:
+    """Format a decimal rate as a percentage with one decimal place."""
+
+    return f"{value * 100:.1f} percent"
+
+
+def _format_optional_rate(value: float | None) -> str:
+    """Format an optional decimal rate for terminal stats output."""
+
+    if value is None:
+        return "n/a"
+    return _format_rate(value)
+
+
+def _format_optional_score(value: float | None) -> str:
+    """Format an optional score for terminal stats output."""
+
+    if value is None:
+        return "n/a"
+    return f"{value:.3f}"
+
+
+def _format_optional_number(value: float | None) -> str:
+    """Format an optional number for terminal stats output."""
+
+    if value is None:
+        return "n/a"
+    return _format_number(value)
 
 
 def _format_date(value) -> str:

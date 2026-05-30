@@ -33,9 +33,9 @@ def test_predlog_home_expands_user_directory(monkeypatch):
 
 
 def test_calibration_bucket_defaults():
-    """Default calibration buckets are percentage values from 0 through 100."""
+    """Default calibration buckets are percentage values from 10 through 90."""
 
-    expected_buckets = tuple(range(0, 101, 10))
+    expected_buckets = tuple(range(10, 100, 10))
 
     assert config.BINARY_CALIBRATION_BUCKETS == expected_buckets
     assert config.RANGE_CONFIDENCE_BUCKETS == expected_buckets
