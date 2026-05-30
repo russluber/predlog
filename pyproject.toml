@@ -7,7 +7,11 @@ authors = [
     { name = "russluber", email = "russelhluber@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "matplotlib>=3.10.9",
+    "rich>=15.0.0",
+    "typer>=0.26.3",
+]
 
 [project.scripts]
 predlog = "predlog:main"
