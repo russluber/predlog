@@ -39,3 +39,6 @@ exports/
 Thumbs.db
 .vscode/
 .idea/
+
+# Planning architecture file
+architecture.md
