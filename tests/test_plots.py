@@ -139,6 +139,22 @@ def test_range_plot_creates_png_at_explicit_path(tmp_path):
     assert_png(saved_path)
 
 
+def test_range_plot_handles_many_predictions_per_confidence_bucket(tmp_path):
+    """Range width diagnostics stay compact with many resolved predictions."""
+
+    output_path = tmp_path / "range-many.png"
+    predictions = [
+        range_prediction(40.0, 60.0, bucket / 100, 50.0)
+        for bucket in config.RANGE_CONFIDENCE_BUCKETS
+        for _ in range(10)
+    ]
+
+    saved_path = plots.plot_range_diagnostics(predictions, output_path=output_path)
+
+    assert saved_path == output_path
+    assert_png(saved_path)
+
+
 def test_range_plot_uses_default_config_path(monkeypatch, tmp_path):
     """Range plot uses config paths and creates the plots directory."""
 

@@ -8,6 +8,7 @@ output.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -165,36 +166,61 @@ def _draw_range_width_panel(
     ax,
     predictions: list[RangePrediction],
 ) -> None:
-    """Draw interval width diagnostics, preferring relative width when possible."""
+    """Draw average interval width by stated confidence bucket."""
 
-    relative_widths = [
-        width
-        for width in (
-            scoring.relative_interval_width(prediction.lower, prediction.upper)
-            for prediction in predictions
-        )
-        if width is not None
-    ]
+    bucket_labels, values, y_label, title = _range_width_bucket_values(predictions)
+
+    ax.bar(bucket_labels, values, width=6, color="#f59e0b")
+    ax.set_title(title)
+    ax.set_xlabel("Stated confidence bucket (%)")
+    ax.set_ylabel(y_label)
+    ax.set_xlim(0, 100)
+    ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
+    ax.grid(True, axis="y", alpha=0.25)
+
+
+def _range_width_bucket_values(
+    predictions: list[RangePrediction],
+) -> tuple[list[int], list[float], str, str]:
+    """Return bucketed average interval widths for the range width panel."""
+
+    relative_widths: dict[int, list[float]] = defaultdict(list)
+    for prediction in predictions:
+        width = scoring.relative_interval_width(prediction.lower, prediction.upper)
+        if width is not None:
+            bucket = stats.nearest_confidence_bucket(prediction.confidence)
+            relative_widths[bucket].append(width * 100)
 
     if relative_widths:
-        values = [width * 100 for width in relative_widths]
-        y_label = "Relative width (%)"
-        title = "Interval Tightness"
-    else:
-        values = [
-            scoring.interval_width(prediction.lower, prediction.upper)
-            for prediction in predictions
-        ]
-        y_label = "Raw width"
-        title = "Interval Tightness (Raw Width)"
+        return (
+            *_ordered_bucket_means(relative_widths),
+            "Average relative width (%)",
+            "Avg Width by Confidence",
+        )
 
-    x_values = list(range(1, len(values) + 1))
-    ax.bar(x_values, values, color="#f59e0b")
-    ax.set_title(title)
-    ax.set_xlabel("Resolved range prediction")
-    ax.set_ylabel(y_label)
-    ax.set_xticks(x_values)
-    ax.grid(True, axis="y", alpha=0.25)
+    raw_widths: dict[int, list[float]] = defaultdict(list)
+    for prediction in predictions:
+        bucket = stats.nearest_confidence_bucket(prediction.confidence)
+        raw_widths[bucket].append(scoring.interval_width(prediction.lower, prediction.upper))
+
+    return (
+        *_ordered_bucket_means(raw_widths),
+        "Average raw width",
+        "Avg Raw Width by Confidence",
+    )
+
+
+def _ordered_bucket_means(bucket_values: dict[int, list[float]]) -> tuple[list[int], list[float]]:
+    """Return configured bucket labels and means for non-empty bucket values."""
+
+    bucket_labels = [
+        bucket for bucket in config.RANGE_CONFIDENCE_BUCKETS if bucket_values[bucket]
+    ]
+    means = [
+        sum(bucket_values[bucket]) / len(bucket_values[bucket])
+        for bucket in bucket_labels
+    ]
+    return bucket_labels, means
 
 
 def _resolved_range_predictions(
