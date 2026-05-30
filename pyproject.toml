@@ -1,7 +1,7 @@
 [project]
 name = "predlog"
 version = "0.1.0"
-description = "A personal CLI prediction tracker and calibration tool"
+description = "A personal CLI tool for probabilistic prediction tracking and calibration."
 readme = "README.md"
 authors = [
     { name = "russluber", email = "russelhluber@gmail.com" }
