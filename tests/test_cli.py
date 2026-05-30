@@ -355,6 +355,8 @@ def test_stats_command_handles_no_resolved_predictions():
     assert result.exit_code == 0
     assert "No resolved binary predictions yet." in result.output
     assert "No resolved range predictions yet." in result.output
+    assert "Binary calibration buckets" not in result.output
+    assert "Range confidence buckets" not in result.output
 
 
 def test_stats_command_summarizes_resolved_predictions():
@@ -377,12 +379,53 @@ def test_stats_command_summarizes_resolved_predictions():
     assert "Resolved: 1" in result.output
     assert "Mean Brier score: 0.090" in result.output
     assert "Directional hit rate: 100.0 percent" in result.output
+    assert "Binary calibration buckets" in result.output
+    assert "Bucket" in result.output
+    assert "Mean forecast" in result.output
+    assert "Event rate" in result.output
+    assert "70%" in result.output
+    assert "70.0%" in result.output
+    assert "100.0%" in result.output
+    assert "sparse" in result.output
     assert "Range predictions" in result.output
     assert "Mean Winkler score: 40.000" in result.output
     assert "Containment rate: 100.0 percent" in result.output
     assert "Range interval width" in result.output
     assert "Average width: 40" in result.output
     assert "Average relative width: 40.0 percent" in result.output
+    assert "Range confidence buckets" in result.output
+    assert "Mean confidence" in result.output
+    assert "Containment" in result.output
+    assert "80%" in result.output
+
+
+def test_stats_command_marks_calibration_buckets_with_enough_evidence():
+    """Stats labels buckets with five or more resolved predictions as enough."""
+
+    binary_outcomes = [1, 1, 1, 1, 0]
+    for outcome in binary_outcomes:
+        prediction = storage.add_binary_prediction("Will the bucket fill?", 0.80)
+        storage.resolve_binary_prediction(prediction.id, outcome)
+
+    range_actuals = [100.0, 102.0, 98.0, 101.0, 99.0]
+    for actual in range_actuals:
+        prediction = storage.add_range_prediction(
+            "Will the actual land in range?",
+            90.0,
+            110.0,
+            0.80,
+        )
+        storage.resolve_range_prediction(prediction.id, actual)
+
+    result = runner.invoke(app, ["stats"])
+
+    assert result.exit_code == 0, result.output
+    assert "Binary calibration buckets" in result.output
+    assert "Range confidence buckets" in result.output
+    assert "80%" in result.output
+    assert "80.0%" in result.output
+    assert "100.0%" in result.output
+    assert "enough" in result.output
 
 
 def test_plot_binary_command_creates_default_plot():

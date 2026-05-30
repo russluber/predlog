@@ -22,7 +22,6 @@ from predlog import config, scoring, stats
 from predlog.models import AnyPrediction, RangePrediction
 
 
-MIN_FILLED_BUCKET_COUNT = 5
 CALIBRATION_MARKER_SIZE = 72
 MAIN_PLOT_RIGHT_EDGE = 0.74
 SIDE_PANEL_X = 0.78
@@ -253,12 +252,12 @@ def _draw_bucket_markers(
     sparse_points = [
         (x_value, y_value)
         for x_value, y_value, count in zip(x_values, y_values, counts, strict=True)
-        if count < MIN_FILLED_BUCKET_COUNT
+        if count < config.CALIBRATION_MIN_EVIDENCE_COUNT
     ]
     filled_points = [
         (x_value, y_value)
         for x_value, y_value, count in zip(x_values, y_values, counts, strict=True)
-        if count >= MIN_FILLED_BUCKET_COUNT
+        if count >= config.CALIBRATION_MIN_EVIDENCE_COUNT
     ]
 
     if sparse_points:
@@ -302,7 +301,7 @@ def _calibration_legend_handles(color: str) -> list[Line2D]:
             markeredgecolor=color,
             markeredgewidth=1.8,
             linestyle="None",
-            label=f"<{MIN_FILLED_BUCKET_COUNT} in bucket",
+            label=f"<{config.CALIBRATION_MIN_EVIDENCE_COUNT} in bucket",
         ),
         Line2D(
             [],
@@ -312,7 +311,7 @@ def _calibration_legend_handles(color: str) -> list[Line2D]:
             markeredgecolor=color,
             markeredgewidth=1.8,
             linestyle="None",
-            label=f">={MIN_FILLED_BUCKET_COUNT} in bucket",
+            label=f">={config.CALIBRATION_MIN_EVIDENCE_COUNT} in bucket",
         ),
     ]
 

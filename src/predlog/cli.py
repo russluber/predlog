@@ -376,6 +376,7 @@ def _print_binary_stats(binary_stats: stats_module.BinaryStats) -> None:
             "Directional hit rate: "
             f"{_format_rate(binary_stats.directional_hit_rate)}"
         )
+    _print_binary_calibration_table(binary_stats)
 
 
 def _print_range_stats(range_stats: stats_module.RangeStats) -> None:
@@ -398,6 +399,59 @@ def _print_range_stats(range_stats: stats_module.RangeStats) -> None:
         "Average relative width: "
         f"{_format_optional_rate(range_stats.average_relative_width)}"
     )
+    _print_range_calibration_table(range_stats)
+
+
+def _print_binary_calibration_table(binary_stats: stats_module.BinaryStats) -> None:
+    """Print bucket-level binary calibration details."""
+
+    if not binary_stats.calibration_buckets:
+        return
+
+    table = Table(title="Binary calibration buckets")
+    table.add_column("Bucket", justify="right")
+    table.add_column("Count", justify="right")
+    table.add_column("Mean forecast", justify="right")
+    table.add_column("Event rate", justify="right")
+    table.add_column("Evidence")
+
+    for bucket in binary_stats.calibration_buckets:
+        table.add_row(
+            _format_bucket_label(bucket.bucket),
+            str(bucket.count),
+            _format_table_rate(bucket.mean_probability),
+            _format_table_rate(bucket.event_rate),
+            _format_bucket_evidence(bucket.count),
+        )
+
+    console.print()
+    console.print(table)
+
+
+def _print_range_calibration_table(range_stats: stats_module.RangeStats) -> None:
+    """Print bucket-level range confidence calibration details."""
+
+    if not range_stats.confidence_buckets:
+        return
+
+    table = Table(title="Range confidence buckets")
+    table.add_column("Bucket", justify="right")
+    table.add_column("Count", justify="right")
+    table.add_column("Mean confidence", justify="right")
+    table.add_column("Containment", justify="right")
+    table.add_column("Evidence")
+
+    for bucket in range_stats.confidence_buckets:
+        table.add_row(
+            _format_bucket_label(bucket.bucket),
+            str(bucket.count),
+            _format_table_rate(bucket.mean_confidence),
+            _format_table_rate(bucket.containment_rate),
+            _format_bucket_evidence(bucket.count),
+        )
+
+    console.print()
+    console.print(table)
 
 
 def _print_open_prediction_menu(predictions: list[AnyPrediction]) -> None:
@@ -568,6 +622,26 @@ def _format_rate(value: float) -> str:
     """Format a decimal rate as a percentage with one decimal place."""
 
     return f"{value * 100:.1f} percent"
+
+
+def _format_table_rate(value: float) -> str:
+    """Format a decimal rate compactly for stats tables."""
+
+    return f"{value * 100:.1f}%"
+
+
+def _format_bucket_label(bucket: int) -> str:
+    """Format a calibration bucket label."""
+
+    return f"{bucket}%"
+
+
+def _format_bucket_evidence(count: int) -> str:
+    """Return the evidence label for a calibration bucket count."""
+
+    if count < config.CALIBRATION_MIN_EVIDENCE_COUNT:
+        return "sparse"
+    return "enough"
 
 
 def _format_optional_rate(value: float | None) -> str:

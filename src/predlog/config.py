@@ -38,6 +38,9 @@ BINARY_CALIBRATION_BUCKETS = tuple(range(10, 100, 10))
 RANGE_CONFIDENCE_BUCKETS = tuple(range(10, 100, 10))
 """Default percentage buckets for range confidence calibration summaries."""
 
+CALIBRATION_MIN_EVIDENCE_COUNT = 5
+"""Minimum resolved predictions for a calibration bucket to count as enough evidence."""
+
 
 def get_predlog_home() -> Path:
     """Return the directory where Predlog should store local user data.
