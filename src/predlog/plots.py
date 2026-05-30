@@ -61,22 +61,19 @@ def plot_binary_calibration(
             45 + (bucket.count * 14) for bucket in binary_stats.calibration_buckets
         ]
         ax.scatter(bucket_labels, event_rates, s=point_sizes, color="#2563eb", zorder=3)
-        ax.plot(bucket_labels, event_rates, color="#2563eb", linewidth=1.5, alpha=0.8)
         for bucket in binary_stats.calibration_buckets:
-            ax.annotate(
-                f"n={bucket.count}",
-                (bucket.bucket, bucket.event_rate * 100),
-                textcoords="offset points",
-                xytext=(0, 8),
-                ha="center",
-                fontsize=8,
+            _annotate_bucket_count(
+                ax,
+                label=f"n={bucket.count}",
+                x_value=bucket.bucket,
+                y_value=bucket.event_rate * 100,
             )
 
     ax.set_title("Binary Calibration")
     ax.set_xlabel("Predicted probability bucket (%)")
     ax.set_ylabel("Actual event frequency (%)")
     ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
+    ax.set_ylim(-3, 103)
     ax.set_xticks(config.BINARY_CALIBRATION_BUCKETS)
     ax.set_yticks(range(0, 101, 10))
     ax.grid(True, alpha=0.25)
@@ -158,22 +155,19 @@ def _draw_range_calibration_panel(ax, range_stats: stats.RangeStats) -> None:
             45 + (bucket.count * 14) for bucket in range_stats.confidence_buckets
         ]
         ax.scatter(bucket_labels, containment_rates, s=point_sizes, color="#16a34a", zorder=3)
-        ax.plot(bucket_labels, containment_rates, color="#16a34a", linewidth=1.5, alpha=0.8)
         for bucket in range_stats.confidence_buckets:
-            ax.annotate(
-                f"n={bucket.count}",
-                (bucket.bucket, bucket.containment_rate * 100),
-                textcoords="offset points",
-                xytext=(0, 8),
-                ha="center",
-                fontsize=8,
+            _annotate_bucket_count(
+                ax,
+                label=f"n={bucket.count}",
+                x_value=bucket.bucket,
+                y_value=bucket.containment_rate * 100,
             )
 
     ax.set_title("Containment Calibration")
     ax.set_xlabel("Stated confidence bucket (%)")
     ax.set_ylabel("Actual containment rate (%)")
     ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
+    ax.set_ylim(-3, 103)
     ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
     ax.set_yticks(range(0, 101, 10))
     ax.grid(True, alpha=0.25)
@@ -236,6 +230,27 @@ def _resolve_output_path(output_path: Path | str | None, default_path: Path) -> 
     if output_path is None:
         return default_path
     return Path(output_path).expanduser()
+
+
+def _annotate_bucket_count(ax, *, label: str, x_value: float, y_value: float) -> None:
+    """Annotate a calibration bucket count without crossing the plot boundary."""
+
+    if y_value >= 95:
+        offset = (0, -10)
+        vertical_alignment = "top"
+    else:
+        offset = (0, 8)
+        vertical_alignment = "bottom"
+
+    ax.annotate(
+        label,
+        (x_value, y_value),
+        textcoords="offset points",
+        xytext=offset,
+        ha="center",
+        va=vertical_alignment,
+        fontsize=8,
+    )
 
 
 def _binary_stats_text(binary_stats: stats.BinaryStats) -> str:

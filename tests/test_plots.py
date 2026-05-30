@@ -90,6 +90,23 @@ def test_binary_plot_uses_default_config_path(monkeypatch, tmp_path):
     assert_png(saved_path)
 
 
+def test_binary_plot_handles_top_edge_bucket_annotations(tmp_path):
+    """Binary plot handles count labels for buckets at a 100% event rate."""
+
+    output_path = tmp_path / "binary-top-edge.png"
+
+    saved_path = plots.plot_binary_calibration(
+        [
+            binary_prediction(0.60, 1),
+            binary_prediction(0.80, 1),
+        ],
+        output_path=output_path,
+    )
+
+    assert saved_path == output_path
+    assert_png(saved_path)
+
+
 def test_binary_plot_raises_with_no_resolved_binary_predictions(tmp_path):
     """Binary plot needs at least one resolved binary prediction."""
 
