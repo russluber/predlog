@@ -281,6 +281,53 @@ def test_stats_command_summarizes_resolved_predictions():
     assert "Average relative width: 40.0 percent" in result.output
 
 
+def test_plot_binary_command_creates_default_plot():
+    """The binary plot command saves the default calibration PNG."""
+
+    binary = storage.add_binary_prediction("Will it rain tomorrow?", 0.70)
+    storage.resolve_binary_prediction(binary.id, 1)
+
+    result = runner.invoke(app, ["plot", "binary"])
+
+    plot_path = config.get_binary_plot_path()
+    assert result.exit_code == 0, result.output
+    assert "Saved binary calibration plot" in result.output
+    assert str(plot_path) in result.output
+    assert plot_path.exists()
+
+
+def test_plot_range_command_creates_default_plot():
+    """The range plot command saves the default diagnostics PNG."""
+
+    range_prediction = storage.add_range_prediction(
+        "How many hours will this project take?",
+        80.0,
+        120.0,
+        0.80,
+    )
+    storage.resolve_range_prediction(range_prediction.id, 100.0)
+
+    result = runner.invoke(app, ["plot", "range"])
+
+    plot_path = config.get_range_plot_path()
+    assert result.exit_code == 0, result.output
+    assert "Saved range diagnostics plot" in result.output
+    assert str(plot_path) in result.output
+    assert plot_path.exists()
+
+
+def test_plot_commands_handle_no_resolved_data():
+    """Plot commands fail cleanly when their resolved data is missing."""
+
+    binary_result = runner.invoke(app, ["plot", "binary"])
+    range_result = runner.invoke(app, ["plot", "range"])
+
+    assert binary_result.exit_code == 1
+    assert "No resolved binary predictions to plot." in binary_result.output
+    assert range_result.exit_code == 1
+    assert "No resolved range predictions to plot." in range_result.output
+
+
 def test_where_command_respects_predlog_home(isolated_predlog_home):
     """The where command shows paths derived from PREDLOG_HOME."""
 

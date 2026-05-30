@@ -31,6 +31,8 @@ app = typer.Typer(
     help="A local-first prediction journal for personal calibration tracking.",
     no_args_is_help=True,
 )
+plot_app = typer.Typer(help="Generate calibration and diagnostics plots.")
+app.add_typer(plot_app, name="plot")
 console = Console(highlight=False, width=160)
 
 
@@ -194,6 +196,38 @@ def where() -> None:
     console.print(f"Plots: {_format_path(config.get_plots_dir())}")
     console.print(f"Binary plot: {_format_path(config.get_binary_plot_path())}")
     console.print(f"Range plot: {_format_path(config.get_range_plot_path())}")
+
+
+@plot_app.command("binary")
+def plot_binary_command() -> None:
+    """Generate the binary calibration plot."""
+
+    from predlog import plots as plots_module
+
+    try:
+        saved_path = plots_module.plot_binary_calibration(
+            storage.load_resolved_predictions()
+        )
+    except ValueError as error:
+        _fail(str(error))
+
+    console.print(f"Saved binary calibration plot: {_format_path(saved_path)}")
+
+
+@plot_app.command("range")
+def plot_range_command() -> None:
+    """Generate the range diagnostics plot."""
+
+    from predlog import plots as plots_module
+
+    try:
+        saved_path = plots_module.plot_range_diagnostics(
+            storage.load_resolved_predictions()
+        )
+    except ValueError as error:
+        _fail(str(error))
+
+    console.print(f"Saved range diagnostics plot: {_format_path(saved_path)}")
 
 
 def _resolve_binary_interactively(prediction: BinaryPrediction) -> None:
