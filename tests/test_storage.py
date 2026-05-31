@@ -324,6 +324,78 @@ def test_load_resolved_predictions_aliases_resolved_list(db_path):
     ) == storage.list_resolved_predictions(db_path=db_path)
 
 
+def test_delete_prediction_removes_open_prediction(db_path):
+    """Open predictions can be deleted by ID."""
+
+    binary = storage.add_binary_prediction(
+        "Delete this open prediction?",
+        0.60,
+        db_path=db_path,
+        created_at=CREATED_BINARY,
+    )
+    range_prediction = storage.add_range_prediction(
+        "Keep this range prediction?",
+        5.0,
+        12.0,
+        0.80,
+        db_path=db_path,
+        created_at=CREATED_RANGE,
+    )
+
+    deleted = storage.delete_prediction(binary.id, db_path=db_path)
+
+    assert deleted == binary
+    assert storage.list_predictions(db_path=db_path) == [range_prediction]
+    assert count_rows(db_path) == 1
+
+
+def test_delete_resolved_prediction_requires_force(db_path):
+    """Resolved predictions are protected unless force is explicit."""
+
+    binary = storage.add_binary_prediction(
+        "Delete this resolved prediction?",
+        0.60,
+        db_path=db_path,
+        created_at=CREATED_BINARY,
+    )
+    storage.resolve_binary_prediction(
+        binary.id,
+        1,
+        db_path=db_path,
+        resolved_at=RESOLVED_AT,
+    )
+
+    with pytest.raises(storage.PredictionDeletionRequiresForceError):
+        storage.delete_prediction(binary.id, db_path=db_path)
+
+    assert len(storage.list_predictions(db_path=db_path)) == 1
+
+
+def test_delete_resolved_prediction_with_force(db_path):
+    """Force deletion removes a resolved prediction."""
+
+    range_prediction = storage.add_range_prediction(
+        "Delete this resolved range prediction?",
+        5.0,
+        12.0,
+        0.80,
+        db_path=db_path,
+        created_at=CREATED_RANGE,
+    )
+    resolved = storage.resolve_range_prediction(
+        range_prediction.id,
+        9.5,
+        db_path=db_path,
+        resolved_at=RESOLVED_AT,
+    )
+
+    deleted = storage.delete_prediction(range_prediction.id, db_path=db_path, force=True)
+
+    assert deleted == resolved
+    assert storage.list_predictions(db_path=db_path) == []
+    assert count_rows(db_path) == 0
+
+
 def test_missing_prediction_raises_custom_error(db_path):
     """Resolving a valid but unknown ID raises PredictionNotFoundError."""
 
@@ -488,3 +560,11 @@ def test_resolve_rejects_invalid_prediction_id(db_path, prediction_id):
 
     with pytest.raises(ValueError):
         storage.resolve_binary_prediction(prediction_id, 1, db_path=db_path)
+
+
+@pytest.mark.parametrize("prediction_id", [0, -1, True, 1.5])
+def test_delete_rejects_invalid_prediction_id(db_path, prediction_id):
+    """Delete operations require positive integer IDs."""
+
+    with pytest.raises(ValueError):
+        storage.delete_prediction(prediction_id, db_path=db_path)

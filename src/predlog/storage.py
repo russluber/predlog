@@ -85,6 +85,18 @@ class PredictionKindMismatchError(StorageError):
         self.actual = actual
 
 
+class PredictionDeletionRequiresForceError(StorageError):
+    """Raised when deleting a resolved prediction without explicit force."""
+
+    def __init__(self, prediction_id: int) -> None:
+        """Create an error for a protected resolved prediction."""
+
+        super().__init__(
+            f"prediction {prediction_id} is resolved; use --force to delete it"
+        )
+        self.prediction_id = prediction_id
+
+
 def initialize_database(db_path: Path | str | None = None) -> Path:
     """Create the Predlog SQLite database and predictions table if needed.
 
@@ -275,6 +287,34 @@ def load_resolved_predictions(
     """Return resolved predictions for stats and plot generation."""
 
     return list_resolved_predictions(db_path=db_path)
+
+
+def delete_prediction(
+    prediction_id: int,
+    *,
+    db_path: Path | str | None = None,
+    force: bool = False,
+) -> AnyPrediction:
+    """Delete a prediction and return the deleted model.
+
+    Open predictions can be deleted directly. Resolved predictions require
+    ``force=True`` so callers do not accidentally remove scored history.
+
+    Raises:
+        PredictionNotFoundError: If ``prediction_id`` is not in the database.
+        PredictionDeletionRequiresForceError: If the prediction is resolved and
+            ``force`` is false.
+        ValueError: If ``prediction_id`` is not a positive integer.
+    """
+
+    _validate_prediction_id(prediction_id)
+    database_path = initialize_database(db_path)
+    with _connect(database_path) as connection:
+        prediction = _get_prediction(connection, prediction_id)
+        if prediction.status == RESOLVED_STATUS and not force:
+            raise PredictionDeletionRequiresForceError(prediction_id)
+        connection.execute("DELETE FROM predictions WHERE id = ?", (prediction_id,))
+    return prediction
 
 
 def resolve_binary_prediction(

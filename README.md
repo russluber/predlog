@@ -51,6 +51,20 @@ uv run predlog list open
 uv run predlog list resolved
 ```
 
+### Delete Predictions
+
+Delete an open prediction by ID:
+
+```bash
+uv run predlog delete 12
+```
+
+Resolved predictions are protected because they affect your scores and calibration history. To delete one anyway, use `--force`:
+
+```bash
+uv run predlog delete 12 --force
+```
+
 ### Resolve Predictions
 
 Resolve predictions interactively:

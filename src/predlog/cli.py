@@ -189,6 +189,34 @@ def resolve(
     _resolve_interactively()
 
 
+@app.command()
+def delete(
+    prediction_id: Annotated[
+        int,
+        typer.Argument(help="Database ID of the prediction to delete."),
+    ],
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Allow deleting a resolved prediction.",
+        ),
+    ] = False,
+) -> None:
+    """Delete a prediction by ID."""
+
+    try:
+        deleted = storage.delete_prediction(prediction_id, force=force)
+    except (storage.StorageError, ValueError) as error:
+        _fail(str(error))
+
+    console.print("[green]Deleted prediction[/green]")
+    console.print(f"ID: {deleted.id}")
+    console.print(f"Status: {deleted.status}")
+    console.print(f"Type: {deleted.kind}")
+    console.print(f"Question: {escape(deleted.question)}")
+
+
 def _resolve_interactively() -> None:
     """Run the interactive resolution menu."""
 

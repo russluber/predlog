@@ -186,6 +186,65 @@ def test_list_command_rejects_unknown_status():
     assert "Status must be 'open' or 'resolved'." in result.output
 
 
+def test_delete_command_removes_open_prediction():
+    """The delete command removes open predictions by ID."""
+
+    prediction = storage.add_binary_prediction("Delete this?", 0.60)
+    storage.add_range_prediction("Keep this?", 5.0, 12.0, 0.80)
+
+    result = runner.invoke(app, ["delete", str(prediction.id)])
+
+    assert result.exit_code == 0, result.output
+    assert "Deleted prediction" in result.output
+    assert f"ID: {prediction.id}" in result.output
+    assert "Status: open" in result.output
+    assert "Type: binary" in result.output
+    assert "Delete this?" in result.output
+    assert [item.question for item in storage.list_predictions()] == ["Keep this?"]
+
+
+def test_delete_command_requires_force_for_resolved_prediction():
+    """Resolved predictions require --force for deletion."""
+
+    prediction = storage.add_binary_prediction("Protect this resolved prediction?", 0.70)
+    storage.resolve_binary_prediction(prediction.id, 1)
+
+    result = runner.invoke(app, ["delete", str(prediction.id)])
+
+    assert result.exit_code == 1
+    assert "use --force to delete it" in result.output
+    assert len(storage.list_predictions()) == 1
+
+
+def test_delete_command_removes_resolved_prediction_with_force():
+    """The delete command removes resolved predictions when forced."""
+
+    prediction = storage.add_range_prediction(
+        "Delete this resolved range prediction?",
+        5.0,
+        12.0,
+        0.80,
+    )
+    storage.resolve_range_prediction(prediction.id, 9.5)
+
+    result = runner.invoke(app, ["delete", str(prediction.id), "--force"])
+
+    assert result.exit_code == 0, result.output
+    assert "Deleted prediction" in result.output
+    assert "Status: resolved" in result.output
+    assert "Type: range" in result.output
+    assert storage.list_predictions() == []
+
+
+def test_delete_command_reports_missing_prediction():
+    """The delete command reports unknown IDs cleanly."""
+
+    result = runner.invoke(app, ["delete", "1"])
+
+    assert result.exit_code == 1
+    assert "prediction 1 was not found" in result.output
+
+
 def test_resolve_command_resolves_binary_prediction_interactively():
     """Interactive binary resolution prints immediate Brier feedback."""
 
