@@ -12,11 +12,13 @@ Predlog is managed with `uv`. To install it from GitHub into a `uv` project:
 uv add "git+https://github.com/russluber/predlog.git"
 ```
 
-If you are working from a local clone of this repository, run commands with:
+Then verify that the command is available:
 
 ```bash
 uv run predlog --help
 ```
+
+If you are working from a local clone of this repository instead, use the same `uv run predlog ...` commands from the repository root.
 
 ### Log Predictions
 
