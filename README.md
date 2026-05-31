@@ -18,12 +18,6 @@ If you are working from a local clone of this repository, run commands with:
 uv run predlog --help
 ```
 
-Predlog stores data locally in `~/.predlog` by default. To try it in a temporary demo directory instead:
-
-```bash
-PREDLOG_HOME=/tmp/predlog-demo uv run predlog where
-```
-
 ### Log Predictions
 
 Log a binary prediction when the outcome will eventually be yes or no:
@@ -126,3 +120,50 @@ uv run predlog where
 ```
 
 The binary calibration plot compares predicted probability buckets against actual event frequency. Hollow markers mean a bucket has fewer than 5 resolved forecasts, and filled markers mean it has at least 5.
+
+### Data Location
+
+Predlog is local-first. By default it stores data under your home directory:
+
+```text
+~/.predlog/
+~/.predlog/predlog.db
+~/.predlog/plots/
+```
+
+On Mac and Linux, `.predlog` is a hidden folder because its name starts with a dot. The `predlog.db` file contains your prediction journal, and the `plots` directory contains generated PNG files.
+
+Use `where` to see the exact paths Predlog is using:
+
+```bash
+uv run predlog where
+```
+
+To use a different location, set the `PREDLOG_HOME` environment variable. This is useful for demos, experiments, or keeping multiple separate prediction journals.
+
+For one command in bash or zsh:
+
+```bash
+PREDLOG_HOME=/tmp/predlog-demo uv run predlog where
+```
+
+For one command in fish:
+
+```fish
+env PREDLOG_HOME=/tmp/predlog-demo uv run predlog where
+```
+
+For the current fish terminal session:
+
+```fish
+set -gx PREDLOG_HOME /tmp/predlog-demo
+uv run predlog where
+```
+
+Unset it in fish with:
+
+```fish
+set -e PREDLOG_HOME
+```
+
+If `PREDLOG_HOME` is not set, Predlog uses the default `~/.predlog` location.
