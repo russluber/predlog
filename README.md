@@ -87,6 +87,24 @@ For binary predictions, Predlog reports resolved count, mean Brier score, and di
 
 Stats also include non-empty calibration bucket tables. These show the bucket count, observed rate, and whether the bucket is still sparse or has enough evidence according to Predlog's 5-forecast threshold.
 
+The main binary metrics are:
+
+- **Mean Brier score**: average error for yes/no probability forecasts. Lower is better; `0.000` is perfect, while `0.250` is roughly what you get from always saying 50 percent.
+- **Directional hit rate**: how often your yes/no lean was right. Forecasts above 50 percent lean yes, forecasts below 50 percent lean no, and 50 percent forecasts are ignored.
+- **Mean forecast**: the average probability you assigned within a bucket. If you mostly enter round forecasts, this will usually match the bucket label.
+- **Event rate**: how often the event actually happened in that bucket. Compare this to mean forecast: if event rate is lower, you were probably overconfident; if it is higher, you were probably underconfident.
+
+The main range metrics are:
+
+- **Mean Winkler score**: average interval forecast score. Lower is better. It rewards narrower intervals when they contain the actual value and penalizes misses, especially misses from high-confidence intervals.
+- **Containment rate**: how often the actual value landed inside your predicted interval.
+- **Average width**: the average raw size of your intervals, computed as upper bound minus lower bound.
+- **Average relative width**: interval width compared with the scale of the prediction. For example, `[90, 110]` has width `20`, midpoint `100`, and relative width `20 percent`.
+- **Mean confidence**: the average confidence you assigned within a bucket.
+- **Containment**: the bucket-level containment rate. Compare this to mean confidence: if containment is lower, your intervals may be too narrow or overconfident; if it is higher, your intervals may be too wide or underconfident.
+
+In short, binary calibration asks whether `mean forecast` matches `event rate`. Range calibration asks whether `mean confidence` matches `containment`. The `Evidence` column is `sparse` below 5 resolved predictions in a bucket and `enough` at 5 or more.
+
 ### Generate Plots
 
 Create a binary calibration plot:
