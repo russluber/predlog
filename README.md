@@ -28,7 +28,7 @@ Log a binary prediction when the outcome will eventually be yes or no:
 uv run predlog binary "Will it rain in San Diego tomorrow?" --prob 30
 ```
 
-This records a 30 percent forecast. Binary probabilities must be greater than 0 and less than 100.
+This records a forecast stating that you think there's a 30% chance of rain in San Diego tomorrow. Binary probabilities must be greater than 0 and less than 100.
 
 Log a range prediction when the outcome will be a number:
 
@@ -36,7 +36,7 @@ Log a range prediction when the outcome will be a number:
 uv run predlog range "What will my commute time be tomorrow, in minutes?" --low 20 --high 35 --conf 80
 ```
 
-This records an 80 percent interval forecast from 20 to 35.
+This records a forecast stating that you're 80% *confident* that your commute tomorrow will take anywhere between 20 and 35 minutes.
 
 ### List Predictions
 
@@ -46,16 +46,21 @@ Show every logged prediction:
 uv run predlog list
 ```
 
-Show only open or resolved predictions:
+Show only your open predictions i.e., predictions that haven't resolved yet:
 
 ```bash
 uv run predlog list open
+```
+
+Show only your resolved predictions:
+
+```bash
 uv run predlog list resolved
 ```
 
 ### Delete Predictions
 
-Delete an open prediction by ID:
+Delete an open prediction by ID (prediction ID found by listing):
 
 ```bash
 uv run predlog delete 12
