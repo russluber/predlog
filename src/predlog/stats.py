@@ -16,6 +16,10 @@ from predlog import config, scoring
 from predlog.models import AnyPrediction, BinaryPrediction, RangePrediction
 
 
+CALIBRATION_FEEDBACK_TOLERANCE = 0.05
+"""Maximum calibration gap that still counts as about right."""
+
+
 @dataclass(frozen=True, kw_only=True)
 class BinaryCalibrationBucket:
     """Calibration summary for binary predictions near one probability bucket.
@@ -24,14 +28,19 @@ class BinaryCalibrationBucket:
         bucket: Bucket label as a percentage from ``10`` through ``90``.
         count: Number of resolved binary predictions in the bucket.
         event_rate: Fraction of predictions in the bucket that resolved yes.
-        mean_probability: Mean forecast probability for predictions in the
+        mean_probability: Average predicted chance for predictions in the
             bucket, stored as a decimal from ``0.0`` to ``1.0``.
+        calibration_gap: Difference between the observed event rate and mean
+            forecast probability.
+        feedback: Short interpretation of the calibration gap.
     """
 
     bucket: int
     count: int
     event_rate: float
     mean_probability: float
+    calibration_gap: float
+    feedback: str
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -45,12 +54,17 @@ class RangeCalibrationBucket:
             intervals for this bucket.
         mean_confidence: Mean stated confidence for predictions in the bucket,
             stored as a decimal from ``0.0`` to ``1.0``.
+        calibration_gap: Difference between containment rate and mean stated
+            confidence.
+        feedback: Short interpretation of the calibration gap.
     """
 
     bucket: int
     count: int
     containment_rate: float
     mean_confidence: float
+    calibration_gap: float
+    feedback: str
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -73,6 +87,7 @@ class RangeStats:
     containment_rate: float | None
     average_width: float | None
     average_relative_width: float | None
+    typical_uncertainty: float | None
     relative_width_count: int
     confidence_buckets: tuple[RangeCalibrationBucket, ...]
 
@@ -156,6 +171,7 @@ def summarize_range(predictions: Iterable[RangePrediction]) -> RangeStats:
             containment_rate=None,
             average_width=None,
             average_relative_width=None,
+            typical_uncertainty=None,
             relative_width_count=0,
             confidence_buckets=(),
         )
@@ -192,6 +208,7 @@ def summarize_range(predictions: Iterable[RangePrediction]) -> RangeStats:
         containment_rate=_mean(containment_results),
         average_width=_mean(widths),
         average_relative_width=_mean(relative_widths),
+        typical_uncertainty=_mean(width / 2 for width in relative_widths),
         relative_width_count=len(relative_widths),
         confidence_buckets=_range_calibration_buckets(resolved),
     )
@@ -263,12 +280,22 @@ def _binary_calibration_buckets(
         probabilities = [
             prediction.probability for prediction in bucket_predictions
         ]
+        event_rate = _mean(outcomes)
+        mean_probability = _mean(probabilities)
+        assert event_rate is not None
+        assert mean_probability is not None
+        calibration_gap = event_rate - mean_probability
         buckets.append(
             BinaryCalibrationBucket(
                 bucket=bucket,
                 count=len(bucket_predictions),
-                event_rate=_mean(outcomes),
-                mean_probability=_mean(probabilities),
+                event_rate=event_rate,
+                mean_probability=mean_probability,
+                calibration_gap=calibration_gap,
+                feedback=_binary_calibration_feedback(
+                    len(bucket_predictions),
+                    calibration_gap,
+                ),
             )
         )
     return tuple(buckets)
@@ -295,12 +322,22 @@ def _range_calibration_buckets(
         confidences = [
             prediction.confidence for prediction in bucket_predictions
         ]
+        containment_rate = _mean(containment_results)
+        mean_confidence = _mean(confidences)
+        assert containment_rate is not None
+        assert mean_confidence is not None
+        calibration_gap = containment_rate - mean_confidence
         buckets.append(
             RangeCalibrationBucket(
                 bucket=bucket,
                 count=len(bucket_predictions),
-                containment_rate=_mean(containment_results),
-                mean_confidence=_mean(confidences),
+                containment_rate=containment_rate,
+                mean_confidence=mean_confidence,
+                calibration_gap=calibration_gap,
+                feedback=_range_calibration_feedback(
+                    len(bucket_predictions),
+                    calibration_gap,
+                ),
             )
         )
     return tuple(buckets)
@@ -311,6 +348,30 @@ def _binary_direction_was_hit(prediction: BinaryPrediction) -> bool:
 
     predicted_outcome = 1 if prediction.probability > 0.5 else 0
     return prediction.outcome == predicted_outcome
+
+
+def _binary_calibration_feedback(count: int, calibration_gap: float) -> str:
+    """Return plain-English feedback for a binary calibration bucket."""
+
+    if count < config.CALIBRATION_MIN_EVIDENCE_COUNT:
+        return "Not enough data"
+    if abs(calibration_gap) <= CALIBRATION_FEEDBACK_TOLERANCE:
+        return "About right"
+    if calibration_gap < 0:
+        return "Predicted too high"
+    return "Predicted too low"
+
+
+def _range_calibration_feedback(count: int, calibration_gap: float) -> str:
+    """Return plain-English feedback for a range calibration bucket."""
+
+    if count < config.CALIBRATION_MIN_EVIDENCE_COUNT:
+        return "Not enough data"
+    if abs(calibration_gap) <= CALIBRATION_FEEDBACK_TOLERANCE:
+        return "About right"
+    if calibration_gap < 0:
+        return "Too narrow"
+    return "Too wide"
 
 
 def _mean(values: Iterable[float | int | bool | None]) -> float | None:

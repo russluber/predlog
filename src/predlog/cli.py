@@ -393,15 +393,17 @@ def _print_binary_stats(binary_stats: stats_module.BinaryStats) -> None:
         return
 
     console.print("[bold]Binary predictions[/bold]")
-    console.print(f"Resolved: {binary_stats.resolved_count}")
+    console.print(
+        f"Number of resolved predictions: {binary_stats.resolved_count}"
+    )
     console.print(
         f"Mean Brier score: {_format_optional_score(binary_stats.mean_brier_score)}"
     )
     if binary_stats.directional_hit_rate is None:
-        console.print("Directional hit rate: n/a")
+        console.print("Correct lean rate: n/a")
     else:
         console.print(
-            "Directional hit rate: "
+            "Correct lean rate: "
             f"{_format_rate(binary_stats.directional_hit_rate)}"
         )
     _print_binary_calibration_table(binary_stats)
@@ -415,17 +417,18 @@ def _print_range_stats(range_stats: stats_module.RangeStats) -> None:
         return
 
     console.print("[bold]Range predictions[/bold]")
-    console.print(f"Resolved: {range_stats.resolved_count}")
+    console.print(
+        f"Number of resolved predictions: {range_stats.resolved_count}"
+    )
     console.print(
         f"Mean Winkler score: {_format_optional_score(range_stats.mean_winkler_score)}"
     )
     console.print(f"Containment rate: {_format_optional_rate(range_stats.containment_rate)}")
     console.print()
-    console.print("[bold]Range interval width[/bold]")
-    console.print(f"Average width: {_format_optional_number(range_stats.average_width)}")
+    console.print("[bold]Range sharpness[/bold]")
     console.print(
-        "Average relative width: "
-        f"{_format_optional_rate(range_stats.average_relative_width)}"
+        "Typical uncertainty: "
+        f"{_format_optional_margin(range_stats.typical_uncertainty)}"
     )
     _print_range_calibration_table(range_stats)
 
@@ -436,12 +439,14 @@ def _print_binary_calibration_table(binary_stats: stats_module.BinaryStats) -> N
     if not binary_stats.calibration_buckets:
         return
 
-    table = Table(title="Binary calibration buckets")
+    table = Table(title="Binary calibration")
     table.add_column("Bucket", justify="right")
     table.add_column("Count", justify="right")
-    table.add_column("Mean forecast", justify="right")
-    table.add_column("Event rate", justify="right")
+    table.add_column("Average predicted chance", justify="right")
+    table.add_column("Actual event rate", justify="right")
+    table.add_column("Calibration gap", justify="right")
     table.add_column("Evidence")
+    table.add_column("Feedback")
 
     for bucket in binary_stats.calibration_buckets:
         table.add_row(
@@ -449,7 +454,9 @@ def _print_binary_calibration_table(binary_stats: stats_module.BinaryStats) -> N
             str(bucket.count),
             _format_table_rate(bucket.mean_probability),
             _format_table_rate(bucket.event_rate),
+            _format_table_gap(bucket.calibration_gap),
             _format_bucket_evidence(bucket.count),
+            bucket.feedback,
         )
 
     console.print()
@@ -462,20 +469,22 @@ def _print_range_calibration_table(range_stats: stats_module.RangeStats) -> None
     if not range_stats.confidence_buckets:
         return
 
-    table = Table(title="Range confidence buckets")
-    table.add_column("Bucket", justify="right")
+    table = Table(title="Range calibration")
+    table.add_column("Confidence", justify="right")
     table.add_column("Count", justify="right")
-    table.add_column("Mean confidence", justify="right")
-    table.add_column("Containment", justify="right")
+    table.add_column("Inside range rate", justify="right")
+    table.add_column("Calibration gap", justify="right")
     table.add_column("Evidence")
+    table.add_column("Feedback")
 
     for bucket in range_stats.confidence_buckets:
         table.add_row(
-            _format_bucket_label(bucket.bucket),
-            str(bucket.count),
             _format_table_rate(bucket.mean_confidence),
+            str(bucket.count),
             _format_table_rate(bucket.containment_rate),
+            _format_table_gap(bucket.calibration_gap),
             _format_bucket_evidence(bucket.count),
+            bucket.feedback,
         )
 
     console.print()
@@ -658,6 +667,12 @@ def _format_table_rate(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
+def _format_table_gap(value: float) -> str:
+    """Format a signed calibration gap for stats tables."""
+
+    return f"{value * 100:+.1f}%"
+
+
 def _format_bucket_label(bucket: int) -> str:
     """Format a calibration bucket label."""
 
@@ -680,20 +695,20 @@ def _format_optional_rate(value: float | None) -> str:
     return _format_rate(value)
 
 
+def _format_optional_margin(value: float | None) -> str:
+    """Format an optional relative uncertainty margin."""
+
+    if value is None:
+        return "n/a"
+    return f"+/- {value * 100:.1f}%"
+
+
 def _format_optional_score(value: float | None) -> str:
     """Format an optional score for terminal stats output."""
 
     if value is None:
         return "n/a"
     return f"{value:.3f}"
-
-
-def _format_optional_number(value: float | None) -> str:
-    """Format an optional number for terminal stats output."""
-
-    if value is None:
-        return "n/a"
-    return _format_number(value)
 
 
 def _format_date(value) -> str:

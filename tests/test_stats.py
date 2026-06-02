@@ -62,6 +62,7 @@ def test_empty_prediction_stats():
     assert summary.range.containment_rate is None
     assert summary.range.average_width is None
     assert summary.range.average_relative_width is None
+    assert summary.range.typical_uncertainty is None
     assert summary.range.relative_width_count == 0
     assert summary.range.confidence_buckets == ()
 
@@ -114,12 +115,17 @@ def test_binary_calibration_bucket_calculations():
     assert buckets[10].count == 1
     assert buckets[10].event_rate == pytest.approx(0.0)
     assert buckets[10].mean_probability == pytest.approx(0.01)
+    assert buckets[10].calibration_gap == pytest.approx(-0.01)
+    assert buckets[10].feedback == "Not enough data"
     assert buckets[70].event_rate == pytest.approx(1.0)
     assert buckets[70].mean_probability == pytest.approx(0.73)
+    assert buckets[70].calibration_gap == pytest.approx(0.27)
     assert buckets[80].event_rate == pytest.approx(0.0)
     assert buckets[80].mean_probability == pytest.approx(0.75)
+    assert buckets[80].calibration_gap == pytest.approx(-0.75)
     assert buckets[90].event_rate == pytest.approx(1.0)
     assert buckets[90].mean_probability == pytest.approx(0.99)
+    assert buckets[90].calibration_gap == pytest.approx(0.01)
 
 
 @pytest.mark.parametrize(
@@ -157,7 +163,7 @@ def test_range_containment_rate_and_mean_winkler_score():
 
 
 def test_range_interval_width_summaries():
-    """Range stats summarize raw width and meaningful relative width."""
+    """Range stats summarize raw width and typical uncertainty."""
 
     summary = stats.summarize_range(
         [
@@ -168,6 +174,7 @@ def test_range_interval_width_summaries():
 
     assert summary.average_width == pytest.approx((40.0 + 2.0) / 2)
     assert summary.average_relative_width == pytest.approx(0.40)
+    assert summary.typical_uncertainty == pytest.approx(0.20)
     assert summary.relative_width_count == 1
 
 
@@ -188,10 +195,42 @@ def test_range_confidence_bucket_calculations():
     assert buckets[70].count == 1
     assert buckets[70].containment_rate == pytest.approx(1.0)
     assert buckets[70].mean_confidence == pytest.approx(0.73)
+    assert buckets[70].calibration_gap == pytest.approx(0.27)
+    assert buckets[70].feedback == "Not enough data"
     assert buckets[80].containment_rate == pytest.approx(0.0)
     assert buckets[80].mean_confidence == pytest.approx(0.75)
+    assert buckets[80].calibration_gap == pytest.approx(-0.75)
     assert buckets[90].containment_rate == pytest.approx(1.0)
     assert buckets[90].mean_confidence == pytest.approx(0.99)
+    assert buckets[90].calibration_gap == pytest.approx(0.01)
+
+
+def test_calibration_feedback_requires_enough_evidence():
+    """Calibration feedback waits for enough bucket evidence."""
+
+    sparse_binary = stats.summarize_binary([binary_prediction(0.80, 0)])
+    enough_binary = stats.summarize_binary(
+        [
+            binary_prediction(0.80, 1),
+            binary_prediction(0.80, 1),
+            binary_prediction(0.80, 1),
+            binary_prediction(0.80, 1),
+            binary_prediction(0.80, 0),
+        ]
+    )
+    enough_range = stats.summarize_range(
+        [
+            range_prediction(90.0, 110.0, 0.80, 100.0),
+            range_prediction(90.0, 110.0, 0.80, 101.0),
+            range_prediction(90.0, 110.0, 0.80, 99.0),
+            range_prediction(90.0, 110.0, 0.80, 102.0),
+            range_prediction(90.0, 110.0, 0.80, 98.0),
+        ]
+    )
+
+    assert sparse_binary.calibration_buckets[0].feedback == "Not enough data"
+    assert enough_binary.calibration_buckets[0].feedback == "About right"
+    assert enough_range.confidence_buckets[0].feedback == "Too wide"
 
 
 @pytest.mark.parametrize(

@@ -414,8 +414,8 @@ def test_stats_command_handles_no_resolved_predictions():
     assert result.exit_code == 0
     assert "No resolved binary predictions yet." in result.output
     assert "No resolved range predictions yet." in result.output
-    assert "Binary calibration buckets" not in result.output
-    assert "Range confidence buckets" not in result.output
+    assert "Binary calibration" not in result.output
+    assert "Range calibration" not in result.output
 
 
 def test_stats_command_summarizes_resolved_predictions():
@@ -435,27 +435,32 @@ def test_stats_command_summarizes_resolved_predictions():
 
     assert result.exit_code == 0, result.output
     assert "Binary predictions" in result.output
-    assert "Resolved: 1" in result.output
+    assert "Number of resolved predictions: 1" in result.output
     assert "Mean Brier score: 0.090" in result.output
-    assert "Directional hit rate: 100.0 percent" in result.output
-    assert "Binary calibration buckets" in result.output
+    assert "Correct lean rate: 100.0 percent" in result.output
+    assert "Binary calibration" in result.output
     assert "Bucket" in result.output
-    assert "Mean forecast" in result.output
-    assert "Event rate" in result.output
+    assert "Average predicted chance" in result.output
+    assert "Actual event rate" in result.output
+    assert "Calibration gap" in result.output
+    assert "Feedback" in result.output
     assert "70%" in result.output
     assert "70.0%" in result.output
     assert "100.0%" in result.output
+    assert "+30.0%" in result.output
     assert "sparse" in result.output
+    assert "Not enough data" in result.output
     assert "Range predictions" in result.output
     assert "Mean Winkler score: 40.000" in result.output
     assert "Containment rate: 100.0 percent" in result.output
-    assert "Range interval width" in result.output
-    assert "Average width: 40" in result.output
-    assert "Average relative width: 40.0 percent" in result.output
-    assert "Range confidence buckets" in result.output
-    assert "Mean confidence" in result.output
-    assert "Containment" in result.output
-    assert "80%" in result.output
+    assert "Range sharpness" in result.output
+    assert "Typical uncertainty: +/- 20.0%" in result.output
+    assert "Average width" not in result.output
+    assert "Average relative width" not in result.output
+    assert "Range calibration" in result.output
+    assert "Confidence" in result.output
+    assert "Inside range rate" in result.output
+    assert "80.0%" in result.output
 
 
 def test_stats_command_marks_calibration_buckets_with_enough_evidence():
@@ -479,12 +484,16 @@ def test_stats_command_marks_calibration_buckets_with_enough_evidence():
     result = runner.invoke(app, ["stats"])
 
     assert result.exit_code == 0, result.output
-    assert "Binary calibration buckets" in result.output
-    assert "Range confidence buckets" in result.output
+    assert "Binary calibration" in result.output
+    assert "Range calibration" in result.output
     assert "80%" in result.output
     assert "80.0%" in result.output
     assert "100.0%" in result.output
+    assert "+0.0%" in result.output
+    assert "+20.0%" in result.output
     assert "enough" in result.output
+    assert "About right" in result.output
+    assert "Too wide" in result.output
 
 
 def test_plot_binary_command_creates_default_plot():
