@@ -188,3 +188,13 @@ set -e PREDLOG_HOME
 ```
 
 If `PREDLOG_HOME` is not set, Predlog uses the default `~/.predlog` location.
+
+
+### References and Inspiration
+
+Predlog is inspired by forecasting and calibration tools, scoring rules, and writing about probabilistic thinking:
+
+- [Superforecasting](https://www.penguinrandomhouse.com/books/227815/superforecasting-by-philip-e-tetlock-and-dan-gardner/) - the book that spawned my interest in forecasting
+- [The Scout Mindset](https://www.penguinrandomhouse.com/books/555240/the-scout-mindset-by-julia-galef/)
+- [Calibrate Your Judgment](https://www.clearerthinking.org/tools/calibrate-your-judgment)
+- [Metaculus](https://www.metaculus.com/) - forecasting platform; its FAQ was really helpful
