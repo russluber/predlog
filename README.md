@@ -26,7 +26,11 @@ If you are working from a local clone of this repository instead, use the same `
 
 ### Log Predictions
 
-Log a binary prediction when the outcome will eventually be yes or no:
+Predlog enables you to log predictions for two types of questions:
+1. Binary prediction questions - questions where the answer is either yes or no.
+2. Numerical range prediction questions - questions where the answer is a positive number.
+
+Log a binary question and your prediction:
 
 ```bash
 uv run predlog binary "Will it rain in San Diego tomorrow (YYYY-MM-DD)?" --prob 30
@@ -34,13 +38,13 @@ uv run predlog binary "Will it rain in San Diego tomorrow (YYYY-MM-DD)?" --prob 
 
 This records a forecast stating that you think there's a 30% chance of rain in San Diego tomorrow. Binary probabilities must be greater than 0 and less than 100.
 
-Log a range prediction when the outcome will be a number:
+Log a range question and your prediction:
 
 ```bash
 uv run predlog range "In minutes, what will my commute time be tomorrow on YYYY-MM-DD?" --low 20 --high 35 --conf 80
 ```
 
-This records a forecast stating that you're 80% *confident* that your commute tomorrow will take anywhere between 20 and 35 minutes.
+This records a forecast stating that you're 80% *confident* that your commute tomorrow will take anywhere between 20 and 35 minutes, inclusive.
 
 Range predictions must have `--low` greater than zero. This keeps numerical ranges on a positive scale so Predlog can compare sharpness with range factors such as `1.5x` or `2x`. If zero is a real possibility, use a binary prediction for whether the value will be nonzero, then a positive range prediction for the conditional amount.
 
