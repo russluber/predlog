@@ -173,21 +173,53 @@ def test_range_plot_handles_many_predictions_per_confidence_bucket(tmp_path):
     assert_png(saved_path)
 
 
-def test_range_sharpness_values_use_typical_uncertainty():
-    """Range sharpness uses half of relative width to match stats output."""
+def test_range_sharpness_scale_uses_median_range_factor():
+    """Range marker colors use median range factor from stats output."""
 
-    bucket_labels, values, y_label, title = plots._range_sharpness_bucket_values(
+    range_stats = stats.summarize_range(
         [
             range_prediction(80.0, 120.0, 0.80, 100.0),
             range_prediction(90.0, 110.0, 0.80, 100.0),
-            range_prediction(40.0, 60.0, 0.70, 50.0),
+            range_prediction(50.0, 100.0, 0.80, 75.0),
+            range_prediction(100.0, 200.0, 0.70, 150.0),
+        ]
+    )
+    sharpness_scale = plots._range_sharpness_scale(range_stats)
+
+    assert sharpness_scale.bucket_values == pytest.approx({70: 2.0, 80: 1.5})
+    assert sharpness_scale.label == "Median range factor"
+
+
+def test_range_factor_color_scale_is_log_scaled_and_capped():
+    """Range factor colors use a stable capped log scale."""
+
+    norm = plots._sharpness_color_norm([1.2, 150.0])
+
+    assert norm.vmin == 1
+    assert norm.vmax == 20
+    assert norm.clip is True
+    assert norm(20.0) == pytest.approx(1.0)
+    assert norm(150.0) == pytest.approx(1.0)
+    assert plots._format_range_factor_tick(1.5, None) == "1.5x"
+    assert plots._format_range_factor_tick(20, None) == ">=20x"
+
+
+def test_range_plot_side_panel_excludes_sharpness_metric():
+    """Range side-panel text keeps sharpness out of the summary box."""
+
+    range_stats = stats.summarize_range(
+        [
+            range_prediction(80.0, 120.0, 0.80, 100.0),
+            range_prediction(90.0, 110.0, 0.80, 100.0),
         ]
     )
 
-    assert bucket_labels == [70, 80]
-    assert values == pytest.approx([20.0, 15.0])
-    assert y_label == "Typical uncertainty (%)"
-    assert title == "Sharpness"
+    text = plots._range_stats_text(range_stats)
+
+    assert "Number resolved: 2" in text
+    assert "Mean Winkler score:" in text
+    assert "Inside range rate: 100.0%" in text
+    assert "Median range factor" not in text
 
 
 def test_range_plot_uses_default_config_path(monkeypatch, tmp_path):
@@ -202,41 +234,6 @@ def test_range_plot_uses_default_config_path(monkeypatch, tmp_path):
 
     assert saved_path == predlog_home / "plots" / "range_calibration_sharpness.png"
     assert_png(saved_path)
-
-
-def test_range_plot_falls_back_to_raw_width_when_relative_width_is_unavailable(
-    tmp_path,
-):
-    """Range plot still works when every interval midpoint is near zero."""
-
-    output_path = tmp_path / "range-raw-width.png"
-
-    saved_path = plots.plot_range_diagnostics(
-        [
-            range_prediction(-1.0, 1.0, 0.80, 0.0),
-            range_prediction(-2.0, 2.0, 0.70, 0.0),
-        ],
-        output_path=output_path,
-    )
-
-    assert saved_path == output_path
-    assert_png(saved_path)
-
-
-def test_range_sharpness_values_fall_back_to_raw_width():
-    """Range sharpness falls back to raw width when midpoint scale is unusable."""
-
-    bucket_labels, values, y_label, title = plots._range_sharpness_bucket_values(
-        [
-            range_prediction(-1.0, 1.0, 0.80, 0.0),
-            range_prediction(-2.0, 2.0, 0.70, 0.0),
-        ]
-    )
-
-    assert bucket_labels == [70, 80]
-    assert values == pytest.approx([4.0, 2.0])
-    assert y_label == "Average raw width"
-    assert title == "Raw Width by Confidence"
 
 
 def test_range_plot_raises_with_no_resolved_range_predictions(tmp_path):

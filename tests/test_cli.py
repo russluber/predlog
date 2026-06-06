@@ -136,6 +136,28 @@ def test_range_command_rejects_invalid_bounds():
     assert storage.list_predictions() == []
 
 
+def test_range_command_rejects_non_positive_lower_bound():
+    """Range predictions must stay on a positive scale."""
+
+    result = runner.invoke(
+        app,
+        [
+            "range",
+            "Invalid positive-scale interval?",
+            "--low",
+            "0",
+            "--high",
+            "5",
+            "--conf",
+            "80",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "range lower bound must be greater than zero" in result.output
+    assert storage.list_predictions() == []
+
+
 def test_list_command_shows_all_open_and_resolved_predictions():
     """The list command can show all, open, or resolved predictions."""
 
@@ -454,12 +476,14 @@ def test_stats_command_summarizes_resolved_predictions():
     assert "Mean Winkler score: 40.000" in result.output
     assert "Containment rate: 100.0 percent" in result.output
     assert "Range sharpness" in result.output
-    assert "Typical uncertainty: +/- 20.0%" in result.output
+    assert "Median range factor: 1.50x" in result.output
     assert "Average width" not in result.output
     assert "Average relative width" not in result.output
     assert "Range calibration" in result.output
     assert "Confidence" in result.output
     assert "Inside range rate" in result.output
+    assert "Median range factor" in result.output
+    assert "1.50x" in result.output
     assert "80.0%" in result.output
 
 

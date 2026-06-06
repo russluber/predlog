@@ -237,10 +237,17 @@ def test_resolved_binary_prediction_must_have_outcome():
 
 @pytest.mark.parametrize(
     ("lower", "upper"),
-    [(5.0, 5.0), (12.0, 5.0), (math.nan, 12.0), (5.0, math.inf)],
+    [
+        (5.0, 5.0),
+        (12.0, 5.0),
+        (0.0, 12.0),
+        (-1.0, 12.0),
+        (math.nan, 12.0),
+        (5.0, math.inf),
+    ],
 )
 def test_range_prediction_rejects_invalid_interval(lower, upper):
-    """Range intervals must be finite and strict."""
+    """Range intervals must be finite, positive-scale, and strict."""
 
     with pytest.raises(ValueError):
         make_open_range(lower=lower, upper=upper)

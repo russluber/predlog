@@ -60,10 +60,7 @@ def test_empty_prediction_stats():
     assert summary.range.resolved_count == 0
     assert summary.range.mean_winkler_score is None
     assert summary.range.containment_rate is None
-    assert summary.range.average_width is None
-    assert summary.range.average_relative_width is None
-    assert summary.range.typical_uncertainty is None
-    assert summary.range.relative_width_count == 0
+    assert summary.range.median_range_factor is None
     assert summary.range.confidence_buckets == ()
 
 
@@ -162,20 +159,18 @@ def test_range_containment_rate_and_mean_winkler_score():
     assert summary.mean_winkler_score == pytest.approx((7.0 + 27.0) / 2)
 
 
-def test_range_interval_width_summaries():
-    """Range stats summarize raw width and typical uncertainty."""
+def test_range_factor_summaries():
+    """Range stats summarize multiplicative interval sharpness."""
 
     summary = stats.summarize_range(
         [
             range_prediction(80.0, 120.0, 0.80, 100.0),
-            range_prediction(-1.0, 1.0, 0.80, 0.0),
+            range_prediction(90.0, 110.0, 0.80, 100.0),
+            range_prediction(50.0, 100.0, 0.80, 75.0),
         ]
     )
 
-    assert summary.average_width == pytest.approx((40.0 + 2.0) / 2)
-    assert summary.average_relative_width == pytest.approx(0.40)
-    assert summary.typical_uncertainty == pytest.approx(0.20)
-    assert summary.relative_width_count == 1
+    assert summary.median_range_factor == pytest.approx(1.5)
 
 
 def test_range_confidence_bucket_calculations():
@@ -183,9 +178,9 @@ def test_range_confidence_bucket_calculations():
 
     summary = stats.summarize_range(
         [
-            range_prediction(0.0, 10.0, 0.73, 5.0),
-            range_prediction(0.0, 10.0, 0.75, 12.0),
-            range_prediction(0.0, 10.0, 0.99, 5.0),
+            range_prediction(1.0, 10.0, 0.73, 5.0),
+            range_prediction(1.0, 10.0, 0.75, 12.0),
+            range_prediction(1.0, 10.0, 0.99, 5.0),
         ]
     )
 
@@ -196,13 +191,16 @@ def test_range_confidence_bucket_calculations():
     assert buckets[70].containment_rate == pytest.approx(1.0)
     assert buckets[70].mean_confidence == pytest.approx(0.73)
     assert buckets[70].calibration_gap == pytest.approx(0.27)
+    assert buckets[70].median_range_factor == pytest.approx(10.0)
     assert buckets[70].feedback == "Not enough data"
     assert buckets[80].containment_rate == pytest.approx(0.0)
     assert buckets[80].mean_confidence == pytest.approx(0.75)
     assert buckets[80].calibration_gap == pytest.approx(-0.75)
+    assert buckets[80].median_range_factor == pytest.approx(10.0)
     assert buckets[90].containment_rate == pytest.approx(1.0)
     assert buckets[90].mean_confidence == pytest.approx(0.99)
     assert buckets[90].calibration_gap == pytest.approx(0.01)
+    assert buckets[90].median_range_factor == pytest.approx(10.0)
 
 
 def test_calibration_feedback_requires_enough_evidence():

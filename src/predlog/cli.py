@@ -78,7 +78,11 @@ def range_command(
     ],
     low: Annotated[
         float,
-        typer.Option(..., "--low", help="Lower bound of the forecast interval."),
+        typer.Option(
+            ...,
+            "--low",
+            help="Positive lower bound of the forecast interval.",
+        ),
     ],
     high: Annotated[
         float,
@@ -429,8 +433,8 @@ def _print_range_stats(range_stats: stats_module.RangeStats) -> None:
     console.print()
     console.print("[bold]Range sharpness[/bold]")
     console.print(
-        "Typical uncertainty: "
-        f"{_format_optional_margin(range_stats.typical_uncertainty)}"
+        "Median range factor: "
+        f"{_format_optional_range_factor(range_stats.median_range_factor)}"
     )
     _print_range_calibration_table(range_stats)
 
@@ -476,6 +480,7 @@ def _print_range_calibration_table(range_stats: stats_module.RangeStats) -> None
     table.add_column("Count", justify="right")
     table.add_column("Inside range rate", justify="right")
     table.add_column("Calibration gap", justify="right")
+    table.add_column("Median range factor", justify="right")
     table.add_column("Evidence")
     table.add_column("Feedback")
 
@@ -485,6 +490,7 @@ def _print_range_calibration_table(range_stats: stats_module.RangeStats) -> None
             str(bucket.count),
             _format_table_rate(bucket.containment_rate),
             _format_table_gap(bucket.calibration_gap),
+            _format_range_factor(bucket.median_range_factor),
             _format_bucket_evidence(bucket.count),
             bucket.feedback,
         )
@@ -697,20 +703,26 @@ def _format_optional_rate(value: float | None) -> str:
     return _format_rate(value)
 
 
-def _format_optional_margin(value: float | None) -> str:
-    """Format an optional relative uncertainty margin."""
-
-    if value is None:
-        return "n/a"
-    return f"+/- {value * 100:.1f}%"
-
-
 def _format_optional_score(value: float | None) -> str:
     """Format an optional score for terminal stats output."""
 
     if value is None:
         return "n/a"
     return f"{value:.3f}"
+
+
+def _format_optional_range_factor(value: float | None) -> str:
+    """Format an optional multiplicative range factor."""
+
+    if value is None:
+        return "n/a"
+    return _format_range_factor(value)
+
+
+def _format_range_factor(value: float) -> str:
+    """Format a multiplicative range factor."""
+
+    return f"{value:.2f}x"
 
 
 def _format_date(value) -> str:

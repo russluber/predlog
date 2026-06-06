@@ -38,6 +38,8 @@ uv run predlog range "What will my commute time be tomorrow, in minutes?" --low 
 
 This records a forecast stating that you're 80% *confident* that your commute tomorrow will take anywhere between 20 and 35 minutes.
 
+Range predictions must have `--low` greater than zero. This keeps numerical ranges on a positive scale so Predlog can compare sharpness with range factors such as `1.5x` or `2x`. If zero is a real possibility, use a binary prediction for whether the value will be nonzero, then a positive range prediction for the conditional amount.
+
 ### List Predictions
 
 Show every logged prediction:
@@ -114,9 +116,9 @@ The main range metrics are:
 
 - **Mean Winkler score**: average interval forecast score. Lower is better. It rewards narrower intervals when they contain the actual value and penalizes misses, especially misses from high-confidence intervals.
 - **Containment rate**: how often the actual value landed inside your predicted interval.
+- **Median range factor**: typical multiplicative spread of your range intervals. For example, `[80, 120]` has range factor `1.5x` because `120 / 80 = 1.5`; smaller values mean sharper, more specific ranges.
 - **Inside range rate**: the bucket-level containment rate.
 - **Calibration gap**: inside range rate minus confidence. A negative gap suggests your ranges may be too narrow or overconfident; a positive gap suggests they may be too wide or underconfident.
-- **Typical uncertainty**: your typical plus/minus range size compared with each range's center. For example, `[80, 120]` has center `100`, so its typical uncertainty is `+/- 20%`.
 
 In short, binary calibration asks whether `average predicted chance` matches `actual event rate`. Range calibration asks whether `confidence` matches `inside range rate`. The `Evidence` column is `sparse` below 5 resolved predictions in a bucket and `enough` at 5 or more. The `Feedback` column waits for enough evidence, then gives a plain-language interpretation such as `About right`, `Predicted too high`, `Too narrow`, or `Too wide`.
 
@@ -140,7 +142,7 @@ Generated plots are saved under Predlog's plots directory. Use `where` to see th
 uv run predlog where
 ```
 
-The binary calibration plot compares predicted probability buckets against actual event rate. The range calibration and sharpness plot uses the same typical-uncertainty idea as `predlog stats`. Hollow markers mean a bucket has fewer than 5 resolved forecasts, and filled markers mean it has at least 5.
+The binary calibration plot compares predicted probability buckets against actual event rate. The range plot keeps calibration as the main view: marker position shows inside range rate, while marker color shows median range factor, with smaller/darker markers meaning sharper intervals. The range-factor color scale is log-scaled and capped at `>=20x` so plots remain comparable over time. Hollow markers mean a bucket has fewer than 5 resolved forecasts, and filled markers mean it has at least 5.
 
 ### Data Location
 

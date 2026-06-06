@@ -67,6 +67,25 @@ def interval_width(lower: float, upper: float) -> float:
     return upper - lower
 
 
+def range_factor(lower: float, upper: float) -> float:
+    """Return the multiplicative spread of a positive forecast interval.
+
+    The range factor is ``upper / lower``. A value close to ``1.0`` means the
+    interval is narrow, while larger values mean the upper bound is many times
+    the lower bound. For example, ``[80, 120]`` has a range factor of ``1.5``.
+
+    This metric is unit-invariant: converting dollars to cents or hours to
+    minutes leaves the factor unchanged. It only makes sense for positive-scale
+    intervals, so Predlog requires ``lower > 0`` for range predictions.
+
+    Raises:
+        ValueError: If the interval bounds are invalid.
+    """
+
+    _validate_interval(lower, upper)
+    return upper / lower
+
+
 def relative_interval_width(lower: float, upper: float) -> float | None:
     """Return interval width relative to the absolute interval midpoint.
 
@@ -154,10 +173,13 @@ def _validate_confidence(confidence: float) -> None:
 
 
 def _validate_interval(lower: float, upper: float) -> None:
-    """Raise ValueError unless interval bounds are finite and lower < upper."""
+    """Raise ValueError unless interval bounds are finite, positive, and strict."""
 
     _validate_finite("lower", lower)
     _validate_finite("upper", upper)
+    if lower <= 0:
+        msg = "range lower bound must be greater than zero"
+        raise ValueError(msg)
     if lower >= upper:
         msg = "interval lower bound must be less than upper bound"
         raise ValueError(msg)

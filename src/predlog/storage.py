@@ -181,7 +181,7 @@ def add_range_prediction(
 
     Args:
         question: User-written prediction question.
-        lower: Lower bound of the forecast interval.
+        lower: Positive lower bound of the forecast interval.
         upper: Upper bound of the forecast interval.
         confidence: Stated interval confidence as a decimal greater than
             ``0.0`` and less than ``1.0``.

@@ -111,7 +111,9 @@ class RangePrediction(Prediction):
 
     Attributes:
         kind: Always ``"range"``.
-        lower: Lower bound of the forecast interval.
+        lower: Lower bound of the forecast interval. Predlog range intervals
+            must be strictly positive so range sharpness can be compared with
+            multiplicative range factors.
         upper: Upper bound of the forecast interval.
         confidence: Stated interval confidence as a decimal greater than
             ``0.0`` and less than ``1.0``.
@@ -239,10 +241,13 @@ def _validate_outcome(outcome: int) -> None:
 
 
 def _validate_interval(lower: float, upper: float) -> None:
-    """Raise ValueError unless interval bounds are finite and lower < upper."""
+    """Raise ValueError unless interval bounds are finite, positive, and strict."""
 
     _validate_finite_number("lower", lower)
     _validate_finite_number("upper", upper)
+    if lower <= 0:
+        msg = "range lower bound must be greater than zero"
+        raise ValueError(msg)
     if lower >= upper:
         msg = "interval lower bound must be less than upper bound"
         raise ValueError(msg)

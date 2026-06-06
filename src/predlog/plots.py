@@ -8,19 +8,22 @@ output.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
 
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LogNorm, Normalize
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.ticker import FuncFormatter
 
-from predlog import config, scoring, stats
-from predlog.models import AnyPrediction, RangePrediction
+from predlog import config, stats
+from predlog.models import AnyPrediction
 
 
 CALIBRATION_MARKER_SIZE = 72
@@ -28,6 +31,17 @@ MAIN_PLOT_RIGHT_EDGE = 0.74
 SIDE_PANEL_X = 0.78
 SIDE_PANEL_STATS_Y = 0.88
 SIDE_PANEL_LEGEND_Y = 0.64
+RANGE_SHARPNESS_COLORMAP = "viridis"
+RANGE_FACTOR_COLOR_CAP = 20
+RANGE_FACTOR_COLOR_TICKS = (1, 1.5, 2, 3, 5, 10, RANGE_FACTOR_COLOR_CAP)
+
+
+@dataclass(frozen=True)
+class _RangeSharpnessScale:
+    """Bucket-level range factors used to color range calibration markers."""
+
+    bucket_values: dict[int, float]
+    label: str
 
 
 def plot_binary_calibration(
@@ -114,7 +128,6 @@ def plot_range_diagnostics(
 
     prediction_list = list(predictions)
     range_stats = stats.summarize_predictions(prediction_list).range
-    resolved_ranges = _resolved_range_predictions(prediction_list)
     if range_stats.resolved_count == 0:
         msg = "No resolved range predictions to plot."
         raise ValueError(msg)
@@ -122,38 +135,76 @@ def plot_range_diagnostics(
     saved_path = _resolve_output_path(output_path, config.get_range_plot_path())
     saved_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5), dpi=150)
-    calibration_ax, sharpness_ax = axes
-    _draw_range_calibration_panel(calibration_ax, range_stats)
-    _draw_range_sharpness_panel(sharpness_ax, resolved_ranges)
+    fig = plt.figure(figsize=(10.8, 5.2), dpi=150)
+    grid = fig.add_gridspec(
+        nrows=1,
+        ncols=2,
+        width_ratios=(4.5, 1.45),
+        left=0.08,
+        right=0.96,
+        bottom=0.14,
+        top=0.82,
+        wspace=0.32,
+    )
+    calibration_ax = fig.add_subplot(grid[0, 0])
+    side_ax = fig.add_subplot(grid[0, 1])
+    side_ax.axis("off")
+
+    sharpness_scale = _range_sharpness_scale(range_stats)
+    sharpness_mappable = _draw_range_calibration_panel(
+        calibration_ax,
+        range_stats,
+        sharpness_scale=sharpness_scale,
+    )
 
     fig.suptitle("Range Predictions", fontweight="bold")
-    fig.tight_layout(rect=(0, 0.02, MAIN_PLOT_RIGHT_EDGE, 0.95))
-    _add_side_panel(fig, stats_text=_range_stats_text(range_stats), color="#16a34a")
+    if sharpness_mappable is not None:
+        _add_range_sharpness_colorbar(
+            fig,
+            calibration_ax,
+            sharpness_mappable,
+            sharpness_scale,
+        )
+    _add_side_panel_to_axis(
+        side_ax,
+        stats_text=_range_stats_text(range_stats),
+        color="0.25",
+    )
     fig.savefig(saved_path)
     plt.close(fig)
     return saved_path
 
 
-def _draw_range_calibration_panel(ax, range_stats: stats.RangeStats) -> None:
-    """Draw stated-confidence vs observed-containment calibration."""
+def _draw_range_calibration_panel(
+    ax,
+    range_stats: stats.RangeStats,
+    *,
+    sharpness_scale: _RangeSharpnessScale,
+) -> ScalarMappable | None:
+    """Draw stated-confidence vs observed-containment calibration.
+
+    Marker position shows calibration. Marker color shows median range factor
+    for that confidence bucket, so sharpness reads as a refinement of the same
+    calibration view instead of a separate chart.
+    """
 
     ax.plot([0, 100], [0, 100], color="0.45", linestyle="--", label="Perfect calibration")
+    sharpness_mappable = None
     if range_stats.confidence_buckets:
         bucket_labels = [bucket.bucket for bucket in range_stats.confidence_buckets]
         containment_rates = [
             bucket.containment_rate * 100 for bucket in range_stats.confidence_buckets
         ]
         bucket_counts = [bucket.count for bucket in range_stats.confidence_buckets]
-        _draw_bucket_markers(
+        sharpness_mappable = _draw_sharpness_bucket_markers(
             ax,
             x_values=bucket_labels,
             y_values=containment_rates,
             counts=bucket_counts,
-            color="#16a34a",
+            sharpness_scale=sharpness_scale,
         )
 
-    ax.set_title("Calibration")
+    ax.set_title("Calibration & Sharpness")
     ax.set_xlabel("Confidence bucket (%)")
     ax.set_ylabel("Inside range rate (%)")
     ax.set_xlim(0, 100)
@@ -161,81 +212,19 @@ def _draw_range_calibration_panel(ax, range_stats: stats.RangeStats) -> None:
     ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
     ax.set_yticks(range(0, 101, 10))
     ax.grid(True, alpha=0.25)
+    return sharpness_mappable
 
 
-def _draw_range_sharpness_panel(
-    ax,
-    predictions: list[RangePrediction],
-) -> None:
-    """Draw range sharpness by stated confidence bucket."""
+def _range_sharpness_scale(range_stats: stats.RangeStats) -> _RangeSharpnessScale:
+    """Return bucketed median range factors for coloring range markers."""
 
-    bucket_labels, values, y_label, title = _range_sharpness_bucket_values(predictions)
-
-    ax.bar(bucket_labels, values, width=6, color="#f59e0b")
-    ax.set_title(title)
-    ax.set_xlabel("Confidence bucket (%)")
-    ax.set_ylabel(y_label)
-    ax.set_xlim(0, 100)
-    ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
-    ax.grid(True, axis="y", alpha=0.25)
-
-
-def _range_sharpness_bucket_values(
-    predictions: list[RangePrediction],
-) -> tuple[list[int], list[float], str, str]:
-    """Return bucketed typical uncertainty values for the sharpness panel."""
-
-    typical_uncertainties: dict[int, list[float]] = defaultdict(list)
-    for prediction in predictions:
-        width = scoring.relative_interval_width(prediction.lower, prediction.upper)
-        if width is not None:
-            bucket = stats.nearest_confidence_bucket(prediction.confidence)
-            typical_uncertainties[bucket].append((width / 2) * 100)
-
-    if typical_uncertainties:
-        return (
-            *_ordered_bucket_means(typical_uncertainties),
-            "Typical uncertainty (%)",
-            "Sharpness",
-        )
-
-    raw_widths: dict[int, list[float]] = defaultdict(list)
-    for prediction in predictions:
-        bucket = stats.nearest_confidence_bucket(prediction.confidence)
-        raw_widths[bucket].append(scoring.interval_width(prediction.lower, prediction.upper))
-
-    return (
-        *_ordered_bucket_means(raw_widths),
-        "Average raw width",
-        "Raw Width by Confidence",
+    return _RangeSharpnessScale(
+        bucket_values={
+            bucket.bucket: bucket.median_range_factor
+            for bucket in range_stats.confidence_buckets
+        },
+        label="Median range factor",
     )
-
-
-def _ordered_bucket_means(bucket_values: dict[int, list[float]]) -> tuple[list[int], list[float]]:
-    """Return configured bucket labels and means for non-empty bucket values."""
-
-    bucket_labels = [
-        bucket for bucket in config.RANGE_CONFIDENCE_BUCKETS if bucket_values[bucket]
-    ]
-    means = [
-        sum(bucket_values[bucket]) / len(bucket_values[bucket])
-        for bucket in bucket_labels
-    ]
-    return bucket_labels, means
-
-
-def _resolved_range_predictions(
-    predictions: Iterable[AnyPrediction],
-) -> list[RangePrediction]:
-    """Return resolved range predictions with actual values."""
-
-    return [
-        prediction
-        for prediction in predictions
-        if isinstance(prediction, RangePrediction)
-        and prediction.is_resolved
-        and prediction.actual is not None
-    ]
 
 
 def _resolve_output_path(output_path: Path | str | None, default_path: Path) -> Path:
@@ -264,6 +253,135 @@ def _add_side_panel(fig, *, stats_text: str, color: str) -> None:
         borderaxespad=0,
         frameon=True,
     )
+
+
+def _add_side_panel_to_axis(ax, *, stats_text: str, color: str) -> None:
+    """Draw calibration summary and marker legend inside a side-panel axis."""
+
+    ax.text(
+        0,
+        1,
+        stats_text,
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
+    )
+    ax.legend(
+        handles=_calibration_legend_handles(color),
+        loc="upper left",
+        bbox_to_anchor=(0, 0.64),
+        borderaxespad=0,
+        frameon=True,
+    )
+
+
+def _add_range_sharpness_colorbar(
+    fig,
+    ax,
+    mappable: ScalarMappable,
+    sharpness_scale: _RangeSharpnessScale,
+) -> None:
+    """Draw the range-factor color scale for the range calibration plot."""
+
+    colorbar = fig.colorbar(mappable, ax=ax, fraction=0.05, pad=0.04)
+    colorbar.ax.set_title(sharpness_scale.label, pad=8)
+    colorbar.set_ticks(RANGE_FACTOR_COLOR_TICKS)
+    colorbar.ax.yaxis.set_major_formatter(_range_factor_formatter)
+
+
+def _draw_sharpness_bucket_markers(
+    ax,
+    *,
+    x_values: list[int],
+    y_values: list[float],
+    counts: list[int],
+    sharpness_scale: _RangeSharpnessScale,
+) -> ScalarMappable | None:
+    """Draw range calibration markers colored by bucket median range factor."""
+
+    colored_points = [
+        (x_value, y_value, count, sharpness_scale.bucket_values[x_value])
+        for x_value, y_value, count in zip(x_values, y_values, counts, strict=True)
+        if x_value in sharpness_scale.bucket_values
+    ]
+    uncolored_points = [
+        (x_value, y_value, count)
+        for x_value, y_value, count in zip(x_values, y_values, counts, strict=True)
+        if x_value not in sharpness_scale.bucket_values
+    ]
+
+    if uncolored_points:
+        _draw_bucket_markers(
+            ax,
+            x_values=[point[0] for point in uncolored_points],
+            y_values=[point[1] for point in uncolored_points],
+            counts=[point[2] for point in uncolored_points],
+            color="0.45",
+        )
+
+    if not colored_points:
+        return None
+
+    values = [point[3] for point in colored_points]
+    norm = _sharpness_color_norm(values)
+    cmap = plt.get_cmap(RANGE_SHARPNESS_COLORMAP)
+    sparse_points = [
+        point
+        for point in colored_points
+        if point[2] < config.CALIBRATION_MIN_EVIDENCE_COUNT
+    ]
+    filled_points = [
+        point
+        for point in colored_points
+        if point[2] >= config.CALIBRATION_MIN_EVIDENCE_COUNT
+    ]
+
+    if sparse_points:
+        ax.scatter(
+            [point[0] for point in sparse_points],
+            [point[1] for point in sparse_points],
+            s=CALIBRATION_MARKER_SIZE,
+            facecolors="none",
+            edgecolors=[cmap(norm(point[3])) for point in sparse_points],
+            linewidths=2.2,
+            zorder=3,
+        )
+    if filled_points:
+        ax.scatter(
+            [point[0] for point in filled_points],
+            [point[1] for point in filled_points],
+            s=CALIBRATION_MARKER_SIZE,
+            c=[point[3] for point in filled_points],
+            cmap=cmap,
+            norm=norm,
+            edgecolors="0.25",
+            linewidths=0.8,
+            zorder=3,
+        )
+
+    mappable = ScalarMappable(norm=norm, cmap=cmap)
+    mappable.set_array(values)
+    return mappable
+
+
+def _sharpness_color_norm(values: list[float]) -> Normalize:
+    """Return a log normalization for multiplicative range factors."""
+
+    if not values:
+        return LogNorm(vmin=1, vmax=RANGE_FACTOR_COLOR_CAP, clip=True)
+    return LogNorm(vmin=1, vmax=RANGE_FACTOR_COLOR_CAP, clip=True)
+
+
+def _format_range_factor_tick(value: float, _position: int | None) -> str:
+    """Format the fixed range-factor colorbar with a capped top label."""
+
+    if value >= RANGE_FACTOR_COLOR_CAP:
+        return f">={RANGE_FACTOR_COLOR_CAP:g}x"
+    return f"{value:g}x"
+
+
+_range_factor_formatter = FuncFormatter(_format_range_factor_tick)
 
 
 def _draw_bucket_markers(
@@ -359,8 +477,7 @@ def _range_stats_text(range_stats: stats.RangeStats) -> str:
     return (
         f"Number resolved: {range_stats.resolved_count}\n"
         f"Mean Winkler score: {_format_optional_score(range_stats.mean_winkler_score)}\n"
-        f"Containment rate: {_format_optional_rate(range_stats.containment_rate)}\n"
-        f"Typical uncertainty: {_format_optional_margin(range_stats.typical_uncertainty)}"
+        f"Inside range rate: {_format_optional_rate(range_stats.containment_rate)}"
     )
 
 
@@ -378,11 +495,3 @@ def _format_optional_rate(value: float | None) -> str:
     if value is None:
         return "n/a"
     return f"{value * 100:.1f}%"
-
-
-def _format_optional_margin(value: float | None) -> str:
-    """Format an optional relative uncertainty margin for plot annotation."""
-
-    if value is None:
-        return "n/a"
-    return f"+/- {value * 100:.1f}%"

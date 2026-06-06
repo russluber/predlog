@@ -61,9 +61,19 @@ def test_interval_width():
     assert scoring.interval_width(5.0, 12.0) == pytest.approx(7.0)
 
 
-@pytest.mark.parametrize(("lower", "upper"), [(5.0, 5.0), (12.0, 5.0)])
+def test_range_factor():
+    """Range factor is the multiplicative spread from lower to upper."""
+
+    assert scoring.range_factor(80.0, 120.0) == pytest.approx(1.5)
+    assert scoring.range_factor(90.0, 110.0) == pytest.approx(110.0 / 90.0)
+
+
+@pytest.mark.parametrize(
+    ("lower", "upper"),
+    [(5.0, 5.0), (12.0, 5.0), (0.0, 5.0), (-1.0, 5.0)],
+)
 def test_interval_functions_reject_invalid_bounds(lower, upper):
-    """Intervals must have a lower bound that is strictly less than upper."""
+    """Intervals must have a positive lower bound less than upper."""
 
     with pytest.raises(ValueError):
         scoring.contained(lower, upper, 6.0)
@@ -75,6 +85,9 @@ def test_interval_functions_reject_invalid_bounds(lower, upper):
         scoring.relative_interval_width(lower, upper)
 
     with pytest.raises(ValueError):
+        scoring.range_factor(lower, upper)
+
+    with pytest.raises(ValueError):
         scoring.winkler_score(lower, upper, 0.80, 6.0)
 
 
@@ -82,13 +95,6 @@ def test_relative_interval_width():
     """Relative interval width divides width by absolute interval midpoint."""
 
     assert scoring.relative_interval_width(80.0, 120.0) == pytest.approx(0.40)
-    assert scoring.relative_interval_width(-120.0, -80.0) == pytest.approx(0.40)
-
-
-def test_relative_interval_width_returns_none_near_zero_midpoint():
-    """Relative width is unavailable when the midpoint is too close to zero."""
-
-    assert scoring.relative_interval_width(-1.0, 1.0) is None
 
 
 def test_winkler_score_inside_interval():

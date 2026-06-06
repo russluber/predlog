@@ -56,6 +56,8 @@ class RangeCalibrationBucket:
             stored as a decimal from ``0.0`` to ``1.0``.
         calibration_gap: Difference between containment rate and mean stated
             confidence.
+        median_range_factor: Median multiplicative spread of prediction
+            intervals in this bucket. Smaller values mean sharper intervals.
         feedback: Short interpretation of the calibration gap.
     """
 
@@ -64,6 +66,7 @@ class RangeCalibrationBucket:
     containment_rate: float
     mean_confidence: float
     calibration_gap: float
+    median_range_factor: float
     feedback: str
 
 
@@ -85,10 +88,7 @@ class RangeStats:
     resolved_count: int
     mean_winkler_score: float | None
     containment_rate: float | None
-    average_width: float | None
-    average_relative_width: float | None
-    typical_uncertainty: float | None
-    relative_width_count: int
+    median_range_factor: float | None
     confidence_buckets: tuple[RangeCalibrationBucket, ...]
 
 
@@ -169,10 +169,7 @@ def summarize_range(predictions: Iterable[RangePrediction]) -> RangeStats:
             resolved_count=0,
             mean_winkler_score=None,
             containment_rate=None,
-            average_width=None,
-            average_relative_width=None,
-            typical_uncertainty=None,
-            relative_width_count=0,
+            median_range_factor=None,
             confidence_buckets=(),
         )
 
@@ -189,27 +186,16 @@ def summarize_range(predictions: Iterable[RangePrediction]) -> RangeStats:
         scoring.contained(prediction.lower, prediction.upper, prediction.actual)
         for prediction in resolved
     ]
-    widths = [
-        scoring.interval_width(prediction.lower, prediction.upper)
+    range_factors = [
+        scoring.range_factor(prediction.lower, prediction.upper)
         for prediction in resolved
-    ]
-    relative_widths = [
-        width
-        for width in (
-            scoring.relative_interval_width(prediction.lower, prediction.upper)
-            for prediction in resolved
-        )
-        if width is not None
     ]
 
     return RangeStats(
         resolved_count=len(resolved),
         mean_winkler_score=_mean(winkler_scores),
         containment_rate=_mean(containment_results),
-        average_width=_mean(widths),
-        average_relative_width=_mean(relative_widths),
-        typical_uncertainty=_mean(width / 2 for width in relative_widths),
-        relative_width_count=len(relative_widths),
+        median_range_factor=_median(range_factors),
         confidence_buckets=_range_calibration_buckets(resolved),
     )
 
@@ -322,10 +308,16 @@ def _range_calibration_buckets(
         confidences = [
             prediction.confidence for prediction in bucket_predictions
         ]
+        range_factors = [
+            scoring.range_factor(prediction.lower, prediction.upper)
+            for prediction in bucket_predictions
+        ]
         containment_rate = _mean(containment_results)
         mean_confidence = _mean(confidences)
+        median_range_factor = _median(range_factors)
         assert containment_rate is not None
         assert mean_confidence is not None
+        assert median_range_factor is not None
         calibration_gap = containment_rate - mean_confidence
         buckets.append(
             RangeCalibrationBucket(
@@ -334,6 +326,7 @@ def _range_calibration_buckets(
                 containment_rate=containment_rate,
                 mean_confidence=mean_confidence,
                 calibration_gap=calibration_gap,
+                median_range_factor=median_range_factor,
                 feedback=_range_calibration_feedback(
                     len(bucket_predictions),
                     calibration_gap,
@@ -381,3 +374,16 @@ def _mean(values: Iterable[float | int | bool | None]) -> float | None:
     if not clean_values:
         return None
     return sum(clean_values) / len(clean_values)
+
+
+def _median(values: Iterable[float | int | bool | None]) -> float | None:
+    """Return the median of non-None values, or None for empty input."""
+
+    clean_values = sorted(float(value) for value in values if value is not None)
+    if not clean_values:
+        return None
+
+    midpoint = len(clean_values) // 2
+    if len(clean_values) % 2 == 1:
+        return clean_values[midpoint]
+    return (clean_values[midpoint - 1] + clean_values[midpoint]) / 2

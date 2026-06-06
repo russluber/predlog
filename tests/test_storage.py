@@ -473,6 +473,16 @@ def test_invalid_insert_input_does_not_add_rows(db_path):
             created_at=CREATED_RANGE,
         )
 
+    with pytest.raises(ValueError):
+        storage.add_range_prediction(
+            "Invalid positive-scale interval",
+            0.0,
+            5.0,
+            0.80,
+            db_path=db_path,
+            created_at=CREATED_RANGE,
+        )
+
     assert count_rows(db_path) == 0
 
 
