@@ -75,16 +75,17 @@ def plot_binary_calibration(
             color="#2563eb",
         )
 
-    ax.set_title("Binary Calibration")
+    ax.set_title("Calibration")
     ax.set_xlabel("Predicted probability bucket (%)")
-    ax.set_ylabel("Actual event frequency (%)")
+    ax.set_ylabel("Actual event rate (%)")
     ax.set_xlim(0, 100)
     ax.set_ylim(-3, 103)
     ax.set_xticks(config.BINARY_CALIBRATION_BUCKETS)
     ax.set_yticks(range(0, 101, 10))
     ax.grid(True, alpha=0.25)
 
-    fig.tight_layout(rect=(0, 0, MAIN_PLOT_RIGHT_EDGE, 1))
+    fig.suptitle("Binary Predictions", fontweight="bold")
+    fig.tight_layout(rect=(0, 0, MAIN_PLOT_RIGHT_EDGE, 0.92))
     _add_side_panel(fig, stats_text=_binary_stats_text(binary_stats), color="#2563eb")
     fig.savefig(saved_path)
     plt.close(fig)
@@ -95,14 +96,14 @@ def plot_range_diagnostics(
     predictions: Iterable[AnyPrediction],
     output_path: Path | str | None = None,
 ) -> Path:
-    """Create and save the range diagnostics plot.
+    """Create and save the range calibration and sharpness plot.
 
     Args:
         predictions: Prediction models. Open and non-range predictions are
             ignored by the stats layer.
         output_path: Optional explicit destination. When omitted, Predlog writes
-            to ``~/.predlog/plots/range_diagnostics.png`` or the equivalent
-            ``PREDLOG_HOME`` location.
+            to ``~/.predlog/plots/range_calibration_sharpness.png`` or the
+            equivalent ``PREDLOG_HOME`` location.
 
     Returns:
         The path of the saved PNG file.
@@ -122,11 +123,11 @@ def plot_range_diagnostics(
     saved_path.parent.mkdir(parents=True, exist_ok=True)
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), dpi=150)
-    calibration_ax, width_ax = axes
+    calibration_ax, sharpness_ax = axes
     _draw_range_calibration_panel(calibration_ax, range_stats)
-    _draw_range_width_panel(width_ax, resolved_ranges)
+    _draw_range_sharpness_panel(sharpness_ax, resolved_ranges)
 
-    fig.suptitle("Range Prediction Diagnostics")
+    fig.suptitle("Range Predictions", fontweight="bold")
     fig.tight_layout(rect=(0, 0.02, MAIN_PLOT_RIGHT_EDGE, 0.95))
     _add_side_panel(fig, stats_text=_range_stats_text(range_stats), color="#16a34a")
     fig.savefig(saved_path)
@@ -152,9 +153,9 @@ def _draw_range_calibration_panel(ax, range_stats: stats.RangeStats) -> None:
             color="#16a34a",
         )
 
-    ax.set_title("Containment Calibration")
-    ax.set_xlabel("Stated confidence bucket (%)")
-    ax.set_ylabel("Actual containment rate (%)")
+    ax.set_title("Calibration")
+    ax.set_xlabel("Confidence bucket (%)")
+    ax.set_ylabel("Inside range rate (%)")
     ax.set_xlim(0, 100)
     ax.set_ylim(-3, 103)
     ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
@@ -162,40 +163,40 @@ def _draw_range_calibration_panel(ax, range_stats: stats.RangeStats) -> None:
     ax.grid(True, alpha=0.25)
 
 
-def _draw_range_width_panel(
+def _draw_range_sharpness_panel(
     ax,
     predictions: list[RangePrediction],
 ) -> None:
-    """Draw average interval width by stated confidence bucket."""
+    """Draw range sharpness by stated confidence bucket."""
 
-    bucket_labels, values, y_label, title = _range_width_bucket_values(predictions)
+    bucket_labels, values, y_label, title = _range_sharpness_bucket_values(predictions)
 
     ax.bar(bucket_labels, values, width=6, color="#f59e0b")
     ax.set_title(title)
-    ax.set_xlabel("Stated confidence bucket (%)")
+    ax.set_xlabel("Confidence bucket (%)")
     ax.set_ylabel(y_label)
     ax.set_xlim(0, 100)
     ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
     ax.grid(True, axis="y", alpha=0.25)
 
 
-def _range_width_bucket_values(
+def _range_sharpness_bucket_values(
     predictions: list[RangePrediction],
 ) -> tuple[list[int], list[float], str, str]:
-    """Return bucketed average interval widths for the range width panel."""
+    """Return bucketed typical uncertainty values for the sharpness panel."""
 
-    relative_widths: dict[int, list[float]] = defaultdict(list)
+    typical_uncertainties: dict[int, list[float]] = defaultdict(list)
     for prediction in predictions:
         width = scoring.relative_interval_width(prediction.lower, prediction.upper)
         if width is not None:
             bucket = stats.nearest_confidence_bucket(prediction.confidence)
-            relative_widths[bucket].append(width * 100)
+            typical_uncertainties[bucket].append((width / 2) * 100)
 
-    if relative_widths:
+    if typical_uncertainties:
         return (
-            *_ordered_bucket_means(relative_widths),
-            "Average relative width (%)",
-            "Avg Width by Confidence",
+            *_ordered_bucket_means(typical_uncertainties),
+            "Typical uncertainty (%)",
+            "Sharpness",
         )
 
     raw_widths: dict[int, list[float]] = defaultdict(list)
@@ -206,7 +207,7 @@ def _range_width_bucket_values(
     return (
         *_ordered_bucket_means(raw_widths),
         "Average raw width",
-        "Avg Raw Width by Confidence",
+        "Raw Width by Confidence",
     )
 
 
@@ -346,18 +347,20 @@ def _binary_stats_text(binary_stats: stats.BinaryStats) -> str:
     """Return text-box content for the binary calibration plot."""
 
     return (
-        f"Resolved: {binary_stats.resolved_count}\n"
-        f"Mean Brier: {_format_optional_score(binary_stats.mean_brier_score)}"
+        f"Number resolved: {binary_stats.resolved_count}\n"
+        f"Mean Brier score: {_format_optional_score(binary_stats.mean_brier_score)}\n"
+        f"Correct lean rate: {_format_optional_rate(binary_stats.directional_hit_rate)}"
     )
 
 
 def _range_stats_text(range_stats: stats.RangeStats) -> str:
-    """Return text-box content for the range diagnostics plot."""
+    """Return text-box content for the range calibration and sharpness plot."""
 
     return (
-        f"Resolved: {range_stats.resolved_count}\n"
-        f"Mean Winkler: {_format_optional_score(range_stats.mean_winkler_score)}\n"
-        f"Containment: {_format_optional_rate(range_stats.containment_rate)}"
+        f"Number resolved: {range_stats.resolved_count}\n"
+        f"Mean Winkler score: {_format_optional_score(range_stats.mean_winkler_score)}\n"
+        f"Containment rate: {_format_optional_rate(range_stats.containment_rate)}\n"
+        f"Typical uncertainty: {_format_optional_margin(range_stats.typical_uncertainty)}"
     )
 
 
@@ -375,3 +378,11 @@ def _format_optional_rate(value: float | None) -> str:
     if value is None:
         return "n/a"
     return f"{value * 100:.1f}%"
+
+
+def _format_optional_margin(value: float | None) -> str:
+    """Format an optional relative uncertainty margin for plot annotation."""
+
+    if value is None:
+        return "n/a"
+    return f"+/- {value * 100:.1f}%"

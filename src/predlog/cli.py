@@ -276,7 +276,7 @@ def plot_binary_command() -> None:
 
 @plot_app.command("range")
 def plot_range_command() -> None:
-    """Generate the range diagnostics plot."""
+    """Generate the range calibration and sharpness plot."""
 
     from predlog import plots as plots_module
 
@@ -287,7 +287,9 @@ def plot_range_command() -> None:
     except ValueError as error:
         _fail(str(error))
 
-    console.print(f"Saved range diagnostics plot: {_format_path(saved_path)}")
+    console.print(
+        f"Saved range calibration and sharpness plot: {_format_path(saved_path)}"
+    )
 
 
 def _resolve_direct(

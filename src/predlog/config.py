@@ -29,8 +29,8 @@ PLOTS_DIRNAME = "plots"
 BINARY_CALIBRATION_PLOT_FILENAME = "binary_calibration.png"
 """Default filename for the binary calibration plot."""
 
-RANGE_DIAGNOSTICS_PLOT_FILENAME = "range_diagnostics.png"
-"""Default filename for the range diagnostics plot."""
+RANGE_CALIBRATION_SHARPNESS_PLOT_FILENAME = "range_calibration_sharpness.png"
+"""Default filename for the range calibration and sharpness plot."""
 
 BINARY_CALIBRATION_BUCKETS = tuple(range(10, 100, 10))
 """Default percentage buckets for binary calibration summaries and plots."""
@@ -93,13 +93,13 @@ def get_binary_plot_path() -> Path:
 
 
 def get_range_plot_path() -> Path:
-    """Return the default output path for the range diagnostics plot.
+    """Return the default output path for the range calibration and sharpness plot.
 
     The v0.1 plotting command is expected to overwrite this file whenever the
     user runs ``predlog plot range``.
     """
 
-    return get_plots_dir() / RANGE_DIAGNOSTICS_PLOT_FILENAME
+    return get_plots_dir() / RANGE_CALIBRATION_SHARPNESS_PLOT_FILENAME
 
 
 def ensure_directories() -> None:

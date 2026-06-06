@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from predlog import config, plots
+from predlog import config, plots, stats
 from predlog.models import OPEN_STATUS, RESOLVED_STATUS, BinaryPrediction, RangePrediction
 
 
@@ -111,6 +111,24 @@ def test_binary_plot_handles_sparse_and_filled_bucket_markers(tmp_path):
     assert_png(saved_path)
 
 
+def test_binary_plot_side_panel_includes_correct_lean_rate():
+    """Binary plot side-panel text mirrors the binary stats summary."""
+
+    binary_stats = stats.summarize_binary(
+        [
+            binary_prediction(0.70, 1),
+            binary_prediction(0.30, 0),
+            binary_prediction(0.60, 0),
+        ]
+    )
+
+    text = plots._binary_stats_text(binary_stats)
+
+    assert "Number resolved: 3" in text
+    assert "Mean Brier score:" in text
+    assert "Correct lean rate: 66.7%" in text
+
+
 def test_binary_plot_raises_with_no_resolved_binary_predictions(tmp_path):
     """Binary plot needs at least one resolved binary prediction."""
 
@@ -140,7 +158,7 @@ def test_range_plot_creates_png_at_explicit_path(tmp_path):
 
 
 def test_range_plot_handles_many_predictions_per_confidence_bucket(tmp_path):
-    """Range width diagnostics stay compact with many resolved predictions."""
+    """Range sharpness diagnostics stay compact with many resolved predictions."""
 
     output_path = tmp_path / "range-many.png"
     predictions = [
@@ -155,6 +173,23 @@ def test_range_plot_handles_many_predictions_per_confidence_bucket(tmp_path):
     assert_png(saved_path)
 
 
+def test_range_sharpness_values_use_typical_uncertainty():
+    """Range sharpness uses half of relative width to match stats output."""
+
+    bucket_labels, values, y_label, title = plots._range_sharpness_bucket_values(
+        [
+            range_prediction(80.0, 120.0, 0.80, 100.0),
+            range_prediction(90.0, 110.0, 0.80, 100.0),
+            range_prediction(40.0, 60.0, 0.70, 50.0),
+        ]
+    )
+
+    assert bucket_labels == [70, 80]
+    assert values == pytest.approx([20.0, 15.0])
+    assert y_label == "Typical uncertainty (%)"
+    assert title == "Sharpness"
+
+
 def test_range_plot_uses_default_config_path(monkeypatch, tmp_path):
     """Range plot uses config paths and creates the plots directory."""
 
@@ -165,7 +200,7 @@ def test_range_plot_uses_default_config_path(monkeypatch, tmp_path):
         [range_prediction(80.0, 120.0, 0.80, 100.0)]
     )
 
-    assert saved_path == predlog_home / "plots" / "range_diagnostics.png"
+    assert saved_path == predlog_home / "plots" / "range_calibration_sharpness.png"
     assert_png(saved_path)
 
 
@@ -186,6 +221,22 @@ def test_range_plot_falls_back_to_raw_width_when_relative_width_is_unavailable(
 
     assert saved_path == output_path
     assert_png(saved_path)
+
+
+def test_range_sharpness_values_fall_back_to_raw_width():
+    """Range sharpness falls back to raw width when midpoint scale is unusable."""
+
+    bucket_labels, values, y_label, title = plots._range_sharpness_bucket_values(
+        [
+            range_prediction(-1.0, 1.0, 0.80, 0.0),
+            range_prediction(-2.0, 2.0, 0.70, 0.0),
+        ]
+    )
+
+    assert bucket_labels == [70, 80]
+    assert values == pytest.approx([4.0, 2.0])
+    assert y_label == "Average raw width"
+    assert title == "Raw Width by Confidence"
 
 
 def test_range_plot_raises_with_no_resolved_range_predictions(tmp_path):

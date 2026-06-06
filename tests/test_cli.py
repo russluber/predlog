@@ -526,7 +526,7 @@ def test_plot_range_command_creates_default_plot():
 
     plot_path = config.get_range_plot_path()
     assert result.exit_code == 0, result.output
-    assert "Saved range diagnostics plot" in result.output
+    assert "Saved range calibration and sharpness plot" in result.output
     assert str(plot_path) in result.output
     assert plot_path.exists()
 
@@ -553,7 +553,7 @@ def test_where_command_respects_predlog_home(isolated_predlog_home):
     assert str(isolated_predlog_home / "predlog.db") in result.output
     assert str(isolated_predlog_home / "plots") in result.output
     assert "binary_calibration.png" in result.output
-    assert "range_diagnostics.png" in result.output
+    assert "range_calibration_sharpness.png" in result.output
 
 
 def test_cli_help_runs():

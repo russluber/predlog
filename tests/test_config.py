@@ -21,7 +21,10 @@ def test_predlog_home_environment_override(monkeypatch, tmp_path):
     assert config.get_database_path() == custom_home / "predlog.db"
     assert config.get_plots_dir() == custom_home / "plots"
     assert config.get_binary_plot_path() == custom_home / "plots" / "binary_calibration.png"
-    assert config.get_range_plot_path() == custom_home / "plots" / "range_diagnostics.png"
+    assert (
+        config.get_range_plot_path()
+        == custom_home / "plots" / "range_calibration_sharpness.png"
+    )
 
 
 def test_predlog_home_expands_user_directory(monkeypatch):

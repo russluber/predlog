@@ -140,7 +140,7 @@ Generated plots are saved under Predlog's plots directory. Use `where` to see th
 uv run predlog where
 ```
 
-The binary calibration plot compares predicted probability buckets against actual event frequency. Hollow markers mean a bucket has fewer than 5 resolved forecasts, and filled markers mean it has at least 5.
+The binary calibration plot compares predicted probability buckets against actual event rate. The range calibration and sharpness plot uses the same typical-uncertainty idea as `predlog stats`. Hollow markers mean a bucket has fewer than 5 resolved forecasts, and filled markers mean it has at least 5.
 
 ### Data Location
 
