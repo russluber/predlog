@@ -1,6 +1,10 @@
 # Predlog
 
-Predlog is a local-first command-line prediction journal for tracking personal probabilistic forecasts. It helps you log binary yes/no predictions and numerical range predictions, resolve them later, and see whether your confidence is becoming better calibrated over time.
+Predlog is a local-first command-line prediction journal for tracking personal probabilistic forecasts. It helps you:
+- Log predictions
+- Resolve them later
+- View your prediction stats, and 
+- Generate your calibration plots 
 
 The problem Predlog solves is that prediction skill is hard to improve from memory alone. By keeping forecasts, outcomes, scores, and calibration plots in one small SQLite-backed CLI, Predlog makes it easier to practice forecasting deliberately and notice where you are overconfident, underconfident, or improving.
 
@@ -25,7 +29,7 @@ If you are working from a local clone of this repository instead, use the same `
 Log a binary prediction when the outcome will eventually be yes or no:
 
 ```bash
-uv run predlog binary "Will it rain in San Diego tomorrow?" --prob 30
+uv run predlog binary "Will it rain in San Diego tomorrow (YYYY-MM-DD)?" --prob 30
 ```
 
 This records a forecast stating that you think there's a 30% chance of rain in San Diego tomorrow. Binary probabilities must be greater than 0 and less than 100.
@@ -33,7 +37,7 @@ This records a forecast stating that you think there's a 30% chance of rain in S
 Log a range prediction when the outcome will be a number:
 
 ```bash
-uv run predlog range "What will my commute time be tomorrow, in minutes?" --low 20 --high 35 --conf 80
+uv run predlog range "In minutes, what will my commute time be tomorrow on YYYY-MM-DD?" --low 20 --high 35 --conf 80
 ```
 
 This records a forecast stating that you're 80% *confident* that your commute tomorrow will take anywhere between 20 and 35 minutes.
@@ -197,6 +201,6 @@ If `PREDLOG_HOME` is not set, Predlog uses the default `~/.predlog` location.
 Predlog is inspired by forecasting and calibration tools, scoring rules, and writing about probabilistic thinking:
 
 - [Superforecasting](https://www.penguinrandomhouse.com/books/227815/superforecasting-by-philip-e-tetlock-and-dan-gardner/) - the book that spawned my interest in forecasting
-- [The Scout Mindset](https://www.penguinrandomhouse.com/books/555240/the-scout-mindset-by-julia-galef/)
-- [Calibrate Your Judgment](https://www.clearerthinking.org/tools/calibrate-your-judgment)
+- [The Scout Mindset](https://www.penguinrandomhouse.com/books/555240/the-scout-mindset-by-julia-galef/) - relevant chapter 6
+- [Calibrate Your Judgment](https://www.clearerthinking.org/tools/calibrate-your-judgment) - great tool
 - [Metaculus](https://www.metaculus.com/) - forecasting platform; its FAQ was really helpful
