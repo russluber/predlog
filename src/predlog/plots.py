@@ -20,7 +20,7 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, PercentFormatter
 
 from predlog import config, stats
 from predlog.models import AnyPrediction
@@ -100,12 +100,14 @@ def plot_binary_calibration(
         )
 
     ax.set_title("Calibration")
-    ax.set_xlabel("Predicted probability bucket (%)")
-    ax.set_ylabel("Actual event rate (%)")
+    ax.set_xlabel("When I think something is ___ likely...")
+    ax.set_ylabel("...It actually happens ___ of the time")
     ax.set_xlim(0, 100)
     ax.set_ylim(-3, 103)
-    ax.set_xticks(config.BINARY_CALIBRATION_BUCKETS)
+    ax.set_xticks(range(0, 101, 10))
     ax.set_yticks(range(0, 101, 10))
+    ax.xaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
     ax.grid(True, alpha=0.25)
 
     fig.suptitle("Binary Predictions", fontweight="bold")
