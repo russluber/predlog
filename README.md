@@ -122,7 +122,7 @@ The main binary metrics are:
 
 The main range metrics are:
 
-- **Mean Winkler score**: average interval forecast score. Lower is better. It rewards narrower intervals when they contain the actual value and penalizes misses, especially misses from high-confidence intervals.
+- **Mean Winkler score**: average interval forecast score. Lower is better. It rewards narrower intervals when they contain the actual value and penalizes misses, especially misses from high-confidence ranges.
 - **Containment rate**: how often the actual value landed inside your predicted interval.
 - **Median range factor**: typical multiplicative spread of your range intervals. For example, `[80, 120]` has range factor `1.5x` because `120 / 80 = 1.5`; smaller values mean sharper, more specific ranges.
 - **Inside range rate**: the bucket-level containment rate.
@@ -142,7 +142,13 @@ uv run predlog plot binary
 
 ![Example binary calibration plot](examples/binary_calibration.png)
 
-Create range diagnostics:
+When you start using Predlog, your binary calibration plot will probably look something like this after logging and resolving a few predictions. The goal is always to get your calibration data points as close to the perfect calibration line as possible over time.
+
+There are a few things to point out in this example. Some data points might be missing. That means you haven't logged and resolved forecasts in that probability bucket. Some data points might be hollow. That just means you should trust those data points less because you've only logged and resolved less than 5 predictions for that probability bucket. 
+
+Most importantly, if your data point is below the perfect calibration line, then you're overconfident for that probability bucket. If your data point is above, then you're underconfident for that probability bucket.
+
+Create range calibration and sharpness plot:
 
 ```bash
 uv run predlog plot range
@@ -151,6 +157,10 @@ uv run predlog plot range
 #### Example Range Calibration Plot
 
 ![Example range calibration and sharpness plot](examples/range_calibration_sharpness.png)
+
+Your range calibration plot works similarly, but each data point represents a confidence bucket for numerical ranges. If a point is below the perfect calibration line, then the real value landed inside your ranges less often than your stated confidence, which suggests your ranges were too narrow or overconfident. If a point is above the line, then the real value landed inside more often than expected, which suggests your ranges may have been too wide or underconfident. Hollow points again mean fewer than 5 resolved range predictions in that bucket, so treat them as early evidence rather than a firm conclusion.
+
+The color of each point shows sharpness using median range factor. A smaller range factor means a tighter, more specific range. For example, `[80, 120]` has a range factor of `1.5x` because the upper bound is 1.5 times the lower bound. Darker points are sharper; lighter points are wider. Ideally, your points move closer to the perfect calibration line over time while staying as sharp as the question reasonably allows.
 
 Generated plots are saved under Predlog's plots directory. Use `where` to see the exact paths:
 
