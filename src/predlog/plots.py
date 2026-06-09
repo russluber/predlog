@@ -220,12 +220,16 @@ def _draw_range_calibration_panel(
         )
 
     ax.set_title("Calibration & Sharpness")
-    ax.set_xlabel("Confidence bucket (%)")
-    ax.set_ylabel("Inside range rate (%)")
+    ax.set_xlabel(
+        "When I think my range has a ___ chance of containing the real value..."
+    )
+    ax.set_ylabel("...That range contains the real value ___ of the time")
     ax.set_xlim(0, 100)
     ax.set_ylim(-3, 103)
-    ax.set_xticks(config.RANGE_CONFIDENCE_BUCKETS)
+    ax.set_xticks(range(0, 101, 10))
     ax.set_yticks(range(0, 101, 10))
+    ax.xaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
     ax.grid(True, alpha=0.25)
     return sharpness_mappable
 
