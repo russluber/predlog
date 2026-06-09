@@ -140,7 +140,7 @@ uv run predlog plot binary
 
 #### Example Binary Calibration Plot
 
-![Example binary calibration plot](examples/binary_calibration.png)
+![Example binary calibration plot](images/binary_calibration.png)
 
 When you start using Predlog, your binary calibration plot will probably look something like this after logging and resolving a few predictions. The goal is always to get your calibration data points as close to the perfect calibration line as possible over time.
 
@@ -156,7 +156,7 @@ uv run predlog plot range
 
 #### Example Range Calibration Plot
 
-![Example range calibration and sharpness plot](examples/range_calibration_sharpness.png)
+![Example range calibration and sharpness plot](images/range_calibration_sharpness.png)
 
 Your range calibration plot works similarly, but each data point represents a confidence bucket for numerical ranges. If a point is below the perfect calibration line, then the real value landed inside your ranges less often than your stated confidence, which suggests your ranges were too narrow or overconfident. If a point is above the line, then the real value landed inside more often than expected, which suggests your ranges may have been too wide or underconfident. Hollow points again mean fewer than 5 resolved range predictions in that bucket, so treat them as early evidence rather than a firm conclusion.
 
