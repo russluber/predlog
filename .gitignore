@@ -29,6 +29,8 @@ htmlcov/
 plots/
 exports/
 *.png
+!examples/
+!examples/*.png
 *.csv
 
 # Environment variables

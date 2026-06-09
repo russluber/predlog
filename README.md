@@ -138,11 +138,19 @@ Create a binary calibration plot:
 uv run predlog plot binary
 ```
 
+#### Example Binary Calibration Plot
+
+![Example binary calibration plot](examples/binary_calibration.png)
+
 Create range diagnostics:
 
 ```bash
 uv run predlog plot range
 ```
+
+#### Example Range Calibration Plot
+
+![Example range calibration and sharpness plot](examples/range_calibration_sharpness.png)
 
 Generated plots are saved under Predlog's plots directory. Use `where` to see the exact paths:
 
