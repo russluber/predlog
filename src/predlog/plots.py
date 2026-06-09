@@ -27,10 +27,6 @@ from predlog.models import AnyPrediction
 
 
 CALIBRATION_MARKER_SIZE = 72
-MAIN_PLOT_RIGHT_EDGE = 0.74
-SIDE_PANEL_X = 0.78
-SIDE_PANEL_STATS_Y = 0.88
-SIDE_PANEL_LEGEND_Y = 0.64
 RANGE_SHARPNESS_COLORMAP = "viridis"
 RANGE_FACTOR_COLOR_CAP = 20
 RANGE_FACTOR_COLOR_TICKS = (1, 1.5, 2, 3, 5, 10, RANGE_FACTOR_COLOR_CAP)
@@ -72,7 +68,21 @@ def plot_binary_calibration(
     saved_path = _resolve_output_path(output_path, config.get_binary_plot_path())
     saved_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(8.8, 5), dpi=150)
+    fig = plt.figure(figsize=(9.8, 5.2), dpi=150)
+    grid = fig.add_gridspec(
+        nrows=1,
+        ncols=2,
+        width_ratios=(4.5, 1.45),
+        left=0.08,
+        right=0.96,
+        bottom=0.14,
+        top=0.82,
+        wspace=0.28,
+    )
+    ax = fig.add_subplot(grid[0, 0])
+    side_ax = fig.add_subplot(grid[0, 1])
+    side_ax.axis("off")
+
     ax.plot([0, 100], [0, 100], color="0.45", linestyle="--", label="Perfect calibration")
 
     if binary_stats.calibration_buckets:
@@ -99,8 +109,11 @@ def plot_binary_calibration(
     ax.grid(True, alpha=0.25)
 
     fig.suptitle("Binary Predictions", fontweight="bold")
-    fig.tight_layout(rect=(0, 0, MAIN_PLOT_RIGHT_EDGE, 0.92))
-    _add_side_panel(fig, stats_text=_binary_stats_text(binary_stats), color="#2563eb")
+    _add_side_panel_to_axis(
+        side_ax,
+        stats_text=_binary_stats_text(binary_stats),
+        color="#2563eb",
+    )
     fig.savefig(saved_path)
     plt.close(fig)
     return saved_path
@@ -233,26 +246,6 @@ def _resolve_output_path(output_path: Path | str | None, default_path: Path) -> 
     if output_path is None:
         return default_path
     return Path(output_path).expanduser()
-
-
-def _add_side_panel(fig, *, stats_text: str, color: str) -> None:
-    """Draw calibration summary and marker legend outside the plot axes."""
-
-    fig.text(
-        SIDE_PANEL_X,
-        SIDE_PANEL_STATS_Y,
-        stats_text,
-        ha="left",
-        va="top",
-        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
-    )
-    fig.legend(
-        handles=_calibration_legend_handles(color),
-        loc="upper left",
-        bbox_to_anchor=(SIDE_PANEL_X, SIDE_PANEL_LEGEND_Y),
-        borderaxespad=0,
-        frameon=True,
-    )
 
 
 def _add_side_panel_to_axis(ax, *, stats_text: str, color: str) -> None:
