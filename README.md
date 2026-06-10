@@ -114,6 +114,42 @@ Show summary statistics for resolved predictions:
 uv run predlog stats
 ```
 
+A trimmed example looks like this:
+
+**Binary predictions**
+
+Number of resolved predictions: 40  
+Mean Brier score: 0.206  
+Correct lean rate: 72.5 percent
+
+**Binary calibration**
+
+| Bucket | Count | Observed event rate | Calibration gap | Evidence | Feedback |
+|---:|---:|---:|---:|---|---|
+| 20% | 3 | 0.0% | -20.0% | sparse | Not enough data |
+| 30% | 8 | 50.0% | +20.0% | enough | Predicted too low |
+| 70% | 10 | 50.0% | -20.0% | enough | Predicted too high |
+
+**Range predictions**
+
+Number of resolved predictions: 42  
+Mean Winkler score: 224.825  
+Containment rate: 59.5 percent
+
+**Range sharpness**
+
+Median range factor: 2.00x
+
+**Range calibration**
+
+| Confidence | Count | Inside range rate | Calibration gap | Median range factor | Evidence | Feedback |
+|---:|---:|---:|---:|---:|---|---|
+| 40.0% | 7 | 71.4% | +31.4% | 1.35x | enough | Too wide |
+| 60.0% | 8 | 62.5% | +2.5% | 2.00x | enough | About right |
+| 80.0% | 9 | 88.9% | +8.9% | 4.50x | enough | Too wide |
+
+Your exact numbers will differ, and a bucket appears only after you have resolved at least one prediction in that bucket.
+
 For binary predictions, Predlog reports the number of resolved predictions, mean Brier score, correct lean rate, and calibration by probability bucket. For range predictions, it reports the number of resolved predictions, mean Winkler score, containment rate, calibration by confidence level, and sharpness.
 
 Stats include non-empty calibration tables. These show the bucket count, observed rate, calibration gap, and whether the bucket is still sparse or has enough evidence according to Predlog's 5-forecast threshold.
