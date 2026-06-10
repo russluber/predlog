@@ -159,6 +159,8 @@ For binary predictions, Predlog reports the number of resolved predictions, mean
 
 Stats include non-empty calibration tables. These show the bucket count, observed rate, calibration gap, and whether the bucket is still sparse or has enough evidence according to Predlog's 5-forecast threshold.
 
+#### Metrics
+
 The main binary metrics are:
 
 - **Mean Brier score**: average error for yes/no probability forecasts. Lower is better; `0.000` is perfect, while `0.250` is roughly what you get from always saying 50 percent.
