@@ -36,15 +36,15 @@ Log a binary question and your prediction:
 uv run predlog binary "Will it rain in San Diego tomorrow (YYYY-MM-DD)?" --prob 30
 ```
 
-This records a forecast stating that you think there's a 30% chance of rain in San Diego tomorrow. Binary probabilities must be greater than 0 and less than 100.
+This records a forecast stating that you think there's a 30% chance of rain in San Diego tomorrow. Binary probabilities must be greater than 0 and less than 100 (to discourage forecasting complete uncertainty and total certainty).
 
 Log a range question and your prediction:
 
 ```bash
-uv run predlog range "In minutes, what will my commute time be tomorrow on YYYY-MM-DD?" --low 20 --high 35 --conf 80
+uv run predlog range "How many people will attend my presentation at the conference on YYYY-MM-DD?" --low 5 --high 36 --conf 80
 ```
 
-This records a forecast stating that you're 80% *confident* that your commute tomorrow will take anywhere between 20 and 35 minutes, inclusive.
+This records a forecast stating that you're 80% *confident* that there will be between 5 and 36 attendees (inclusive) for your conference presentation on the indicated date.
 
 Range predictions must have `--low` greater than zero. This keeps numerical ranges on a positive scale so Predlog can compare sharpness with range factors such as `1.5x` or `2x`. If zero is a real possibility, use a binary prediction for whether the value will be nonzero, then a positive range prediction for the conditional amount.
 
@@ -218,7 +218,7 @@ set -e PREDLOG_HOME
 If `PREDLOG_HOME` is not set, Predlog uses the default `~/.predlog` location.
 
 
-### References and Inspiration
+## References and Inspiration
 
 Predlog is inspired by forecasting and calibration tools, scoring rules, and writing about probabilistic thinking:
 
