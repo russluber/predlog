@@ -159,6 +159,14 @@ For binary predictions, Predlog reports the number of resolved predictions, mean
 
 Stats include non-empty calibration tables. These show the bucket count, observed rate, calibration gap, and whether the bucket is still sparse or has enough evidence according to Predlog's 5-forecast threshold.
 
+To see a short glossary of the stats terminology in the CLI:
+
+```bash
+uv run predlog explain stats
+```
+
+This explains terms like mean Brier score, correct lean rate, observed event rate, containment rate, and median range factor without leaving the terminal.
+
 #### Metrics
 
 The main binary metrics are:
