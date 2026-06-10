@@ -458,9 +458,19 @@ def test_invalid_insert_input_does_not_add_rows(db_path):
     with pytest.raises(ValueError):
         storage.add_binary_prediction(
             "Invalid probability",
-            1.01,
+            0.73,
             db_path=db_path,
             created_at=CREATED_BINARY,
+        )
+
+    with pytest.raises(ValueError):
+        storage.add_range_prediction(
+            "Invalid confidence",
+            5.0,
+            12.0,
+            0.95,
+            db_path=db_path,
+            created_at=CREATED_RANGE,
         )
 
     with pytest.raises(ValueError):

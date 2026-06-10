@@ -8,6 +8,8 @@ Predlog is a local-first command-line prediction journal for tracking personal p
 
 The problem Predlog solves is that prediction skill is hard to improve from memory alone. By keeping forecasts, outcomes, scores, and calibration plots in one small SQLite-backed CLI, Predlog makes it easier to practice forecasting deliberately and notice where you are overconfident, underconfident, or improving.
 
+This tool will help you *get started* with probabilistic forecasting. 
+
 ## Usage
 
 Predlog is managed with `uv`. To install it from GitHub into a `uv` project:
@@ -36,7 +38,9 @@ Log a binary question and your prediction:
 uv run predlog binary "Will it rain in San Diego tomorrow (YYYY-MM-DD)?" --prob 30
 ```
 
-This records a forecast stating that you think there's a 30% chance of rain in San Diego tomorrow. Binary probabilities must be greater than 0 and less than 100 (to discourage forecasting complete uncertainty and total certainty).
+This records a forecast stating that you think there's a 30% chance of rain in San Diego tomorrow. 
+
+Binary probabilities must be one of `10, 20, 30, ..., 90`. Predlog intentionally uses 10-point increments to reduce false precision while you build calibration skill.
 
 Log a range question and your prediction:
 
@@ -45,6 +49,8 @@ uv run predlog range "How many people will attend my presentation at the confere
 ```
 
 This records a forecast stating that you're 80% *confident* that there will be between 5 and 36 attendees (inclusive) for your conference presentation on the indicated date.
+
+Range confidence must also be one of `10, 20, 30, ..., 90`. The goal is to make each confidence choice meaningfully different instead of pretending that a beginner (like you) can reliably distinguish between, say, 68% and 74%.
 
 Range predictions must have `--low` greater than zero. This keeps numerical ranges on a positive scale so Predlog can compare sharpness with range factors such as `1.5x` or `2x`. If zero is a real possibility, use a binary prediction for whether the value will be nonzero, then a positive range prediction for the conditional amount.
 
@@ -116,9 +122,9 @@ The main binary metrics are:
 
 - **Mean Brier score**: average error for yes/no probability forecasts. Lower is better; `0.000` is perfect, while `0.250` is roughly what you get from always saying 50 percent.
 - **Correct lean rate**: how often your yes/no lean was right. Forecasts above 50 percent lean yes, forecasts below 50 percent lean no, and 50 percent forecasts are ignored.
-- **Average predicted chance**: the average probability you assigned within a bucket. If you mostly enter round forecasts, this will usually match the bucket label.
-- **Actual event rate**: how often the event actually happened in that bucket.
-- **Calibration gap**: actual event rate minus average predicted chance. A negative gap means the event happened less often than you predicted; a positive gap means it happened more often than you predicted.
+- **Bucket**: the predicted chance you chose, such as 30%, 70%, or 90%.
+- **Observed event rate**: how often the event actually happened in that bucket.
+- **Calibration gap**: observed event rate minus the bucket probability. A negative gap means the event happened less often than you predicted; a positive gap means it happened more often than you predicted.
 
 The main range metrics are:
 
@@ -128,7 +134,7 @@ The main range metrics are:
 - **Inside range rate**: the bucket-level containment rate.
 - **Calibration gap**: inside range rate minus confidence. A negative gap suggests your ranges may be too narrow or overconfident; a positive gap suggests they may be too wide or underconfident.
 
-In short, binary calibration asks whether `average predicted chance` matches `actual event rate`. Range calibration asks whether `confidence` matches `inside range rate`. The `Evidence` column is `sparse` below 5 resolved predictions in a bucket and `enough` at 5 or more. The `Feedback` column waits for enough evidence, then gives a plain-language interpretation such as `About right`, `Predicted too high`, `Too narrow`, or `Too wide`.
+In short, binary calibration asks whether each probability `bucket` matches the `observed event rate`. Range calibration asks whether `confidence` matches `inside range rate`. The `Evidence` column is `sparse` below 5 resolved predictions in a bucket and `enough` at 5 or more. The `Feedback` column waits for enough evidence, then gives a plain-language interpretation such as `About right`, `Predicted too high`, `Too narrow`, or `Too wide`.
 
 ### Generate Plots
 

@@ -76,9 +76,9 @@ def test_range_command_creates_open_range_prediction():
 
 
 def test_binary_command_rejects_invalid_probability():
-    """Binary probabilities must be greater than 0 and less than 100 percent."""
+    """Binary probabilities must use Predlog's 10-point forecast scale."""
 
-    for probability in ["0", "100"]:
+    for probability in ["0", "73", "75", "95", "100"]:
         result = runner.invoke(
             app,
             ["binary", "Invalid probability?", "--prob", probability],
@@ -86,31 +86,35 @@ def test_binary_command_rejects_invalid_probability():
 
         assert result.exit_code == 1
         assert (
-            "probability must be greater than 0 and less than 100 percent"
+            "probability must be one of 10, 20, ..., 90 percent"
             in result.output
         )
     assert storage.list_predictions() == []
 
 
 def test_range_command_rejects_invalid_confidence():
-    """Range confidence must be greater than 0 and less than 100 percent."""
+    """Range confidence must use Predlog's 10-point forecast scale."""
 
-    result = runner.invoke(
-        app,
-        [
-            "range",
-            "Invalid confidence?",
-            "--low",
-            "5",
-            "--high",
-            "12",
-            "--conf",
-            "100",
-        ],
-    )
+    for confidence in ["0", "73", "75", "95", "100"]:
+        result = runner.invoke(
+            app,
+            [
+                "range",
+                "Invalid confidence?",
+                "--low",
+                "5",
+                "--high",
+                "12",
+                "--conf",
+                confidence,
+            ],
+        )
 
-    assert result.exit_code == 1
-    assert "confidence must be greater than 0 and less than 100 percent" in result.output
+        assert result.exit_code == 1
+        assert (
+            "confidence must be one of 10, 20, ..., 90 percent"
+            in result.output
+        )
     assert storage.list_predictions() == []
 
 
@@ -462,12 +466,11 @@ def test_stats_command_summarizes_resolved_predictions():
     assert "Correct lean rate: 100.0 percent" in result.output
     assert "Binary calibration" in result.output
     assert "Bucket" in result.output
-    assert "Average predicted chance" in result.output
-    assert "Actual event rate" in result.output
+    assert "Average predicted chance" not in result.output
+    assert "Observed event rate" in result.output
     assert "Calibration gap" in result.output
     assert "Feedback" in result.output
     assert "70%" in result.output
-    assert "70.0%" in result.output
     assert "100.0%" in result.output
     assert "+30.0%" in result.output
     assert "sparse" in result.output

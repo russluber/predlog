@@ -95,14 +95,14 @@ def test_binary_directional_hit_rate_excludes_fifty_percent_predictions():
 
 
 def test_binary_calibration_bucket_calculations():
-    """Binary calibration buckets use nearest 10-point probability buckets."""
+    """Binary calibration buckets use exact 10-point probabilities."""
 
     summary = stats.summarize_binary(
         [
-            binary_prediction(0.01, 0),
-            binary_prediction(0.73, 1),
-            binary_prediction(0.75, 0),
-            binary_prediction(0.99, 1),
+            binary_prediction(0.10, 0),
+            binary_prediction(0.70, 1),
+            binary_prediction(0.80, 0),
+            binary_prediction(0.90, 1),
         ]
     )
 
@@ -111,37 +111,42 @@ def test_binary_calibration_bucket_calculations():
     assert set(buckets) == {10, 70, 80, 90}
     assert buckets[10].count == 1
     assert buckets[10].event_rate == pytest.approx(0.0)
-    assert buckets[10].mean_probability == pytest.approx(0.01)
-    assert buckets[10].calibration_gap == pytest.approx(-0.01)
+    assert buckets[10].calibration_gap == pytest.approx(-0.10)
     assert buckets[10].feedback == "Not enough data"
     assert buckets[70].event_rate == pytest.approx(1.0)
-    assert buckets[70].mean_probability == pytest.approx(0.73)
-    assert buckets[70].calibration_gap == pytest.approx(0.27)
+    assert buckets[70].calibration_gap == pytest.approx(0.30)
     assert buckets[80].event_rate == pytest.approx(0.0)
-    assert buckets[80].mean_probability == pytest.approx(0.75)
-    assert buckets[80].calibration_gap == pytest.approx(-0.75)
+    assert buckets[80].calibration_gap == pytest.approx(-0.80)
     assert buckets[90].event_rate == pytest.approx(1.0)
-    assert buckets[90].mean_probability == pytest.approx(0.99)
-    assert buckets[90].calibration_gap == pytest.approx(0.01)
+    assert buckets[90].calibration_gap == pytest.approx(0.10)
 
 
 @pytest.mark.parametrize(
     ("decimal_value", "expected_bucket"),
     [
-        (0.01, 10),
-        (0.14, 10),
-        (0.15, 20),
-        (0.73, 70),
-        (0.75, 80),
-        (0.84, 80),
-        (0.85, 90),
-        (0.99, 90),
+        (0.10, 10),
+        (0.20, 20),
+        (0.30, 30),
+        (0.40, 40),
+        (0.50, 50),
+        (0.60, 60),
+        (0.70, 70),
+        (0.80, 80),
+        (0.90, 90),
     ],
 )
 def test_nearest_probability_bucket(decimal_value, expected_bucket):
-    """Probability bucket assignment matches the calibration policy."""
+    """Probability bucket assignment matches the exact forecast scale."""
 
     assert stats.nearest_probability_bucket(decimal_value) == expected_bucket
+
+
+@pytest.mark.parametrize("decimal_value", [0.01, 0.73, 0.75, 0.99])
+def test_nearest_probability_bucket_rejects_off_scale_values(decimal_value):
+    """Probability bucket assignment rejects non-10-point values."""
+
+    with pytest.raises(ValueError):
+        stats.nearest_probability_bucket(decimal_value)
 
 
 def test_range_containment_rate_and_mean_winkler_score():
@@ -174,13 +179,13 @@ def test_range_factor_summaries():
 
 
 def test_range_confidence_bucket_calculations():
-    """Range calibration buckets use nearest 10-point confidence buckets."""
+    """Range calibration buckets use exact 10-point confidence values."""
 
     summary = stats.summarize_range(
         [
-            range_prediction(1.0, 10.0, 0.73, 5.0),
-            range_prediction(1.0, 10.0, 0.75, 12.0),
-            range_prediction(1.0, 10.0, 0.99, 5.0),
+            range_prediction(1.0, 10.0, 0.70, 5.0),
+            range_prediction(1.0, 10.0, 0.80, 12.0),
+            range_prediction(1.0, 10.0, 0.90, 5.0),
         ]
     )
 
@@ -189,17 +194,17 @@ def test_range_confidence_bucket_calculations():
     assert set(buckets) == {70, 80, 90}
     assert buckets[70].count == 1
     assert buckets[70].containment_rate == pytest.approx(1.0)
-    assert buckets[70].mean_confidence == pytest.approx(0.73)
-    assert buckets[70].calibration_gap == pytest.approx(0.27)
+    assert buckets[70].mean_confidence == pytest.approx(0.70)
+    assert buckets[70].calibration_gap == pytest.approx(0.30)
     assert buckets[70].median_range_factor == pytest.approx(10.0)
     assert buckets[70].feedback == "Not enough data"
     assert buckets[80].containment_rate == pytest.approx(0.0)
-    assert buckets[80].mean_confidence == pytest.approx(0.75)
-    assert buckets[80].calibration_gap == pytest.approx(-0.75)
+    assert buckets[80].mean_confidence == pytest.approx(0.80)
+    assert buckets[80].calibration_gap == pytest.approx(-0.80)
     assert buckets[80].median_range_factor == pytest.approx(10.0)
     assert buckets[90].containment_rate == pytest.approx(1.0)
-    assert buckets[90].mean_confidence == pytest.approx(0.99)
-    assert buckets[90].calibration_gap == pytest.approx(0.01)
+    assert buckets[90].mean_confidence == pytest.approx(0.90)
+    assert buckets[90].calibration_gap == pytest.approx(0.10)
     assert buckets[90].median_range_factor == pytest.approx(10.0)
 
 
@@ -234,20 +239,29 @@ def test_calibration_feedback_requires_enough_evidence():
 @pytest.mark.parametrize(
     ("decimal_value", "expected_bucket"),
     [
-        (0.01, 10),
-        (0.14, 10),
-        (0.15, 20),
-        (0.73, 70),
-        (0.75, 80),
-        (0.84, 80),
-        (0.85, 90),
-        (0.99, 90),
+        (0.10, 10),
+        (0.20, 20),
+        (0.30, 30),
+        (0.40, 40),
+        (0.50, 50),
+        (0.60, 60),
+        (0.70, 70),
+        (0.80, 80),
+        (0.90, 90),
     ],
 )
 def test_nearest_confidence_bucket(decimal_value, expected_bucket):
-    """Confidence bucket assignment matches the calibration policy."""
+    """Confidence bucket assignment matches the exact forecast scale."""
 
     assert stats.nearest_confidence_bucket(decimal_value) == expected_bucket
+
+
+@pytest.mark.parametrize("decimal_value", [0.01, 0.73, 0.75, 0.99])
+def test_nearest_confidence_bucket_rejects_off_scale_values(decimal_value):
+    """Confidence bucket assignment rejects non-10-point values."""
+
+    with pytest.raises(ValueError):
+        stats.nearest_confidence_bucket(decimal_value)
 
 
 def test_summarize_predictions_ignores_open_predictions():

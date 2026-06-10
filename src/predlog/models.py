@@ -18,6 +18,8 @@ from datetime import datetime
 import math
 from typing import Literal, TypeAlias
 
+from predlog import config
+
 BINARY_KIND = "binary"
 """Storage and model label for binary yes/no predictions."""
 
@@ -88,7 +90,8 @@ class BinaryPrediction(Prediction):
 
     Attributes:
         kind: Always ``"binary"``.
-        probability: Forecast probability as a decimal from ``0.0`` to ``1.0``.
+        probability: Forecast probability as a decimal from ``0.10`` to
+            ``0.90`` in 10-point increments.
         outcome: Resolved outcome, where ``1`` means yes and ``0`` means no.
             Open binary predictions must have ``outcome=None``.
     """
@@ -115,8 +118,8 @@ class RangePrediction(Prediction):
             must be strictly positive so range sharpness can be compared with
             multiplicative range factors.
         upper: Upper bound of the forecast interval.
-        confidence: Stated interval confidence as a decimal greater than
-            ``0.0`` and less than ``1.0``.
+        confidence: Stated interval confidence as a decimal from ``0.10`` to
+            ``0.90`` in 10-point increments.
         actual: Resolved numerical value. Open range predictions must have
             ``actual=None``.
     """
@@ -221,11 +224,11 @@ def _validate_range_resolution(
 
 
 def _validate_probability(probability: float) -> None:
-    """Raise ValueError unless a binary probability is finite and in range."""
+    """Raise ValueError unless a binary probability is on Predlog's scale."""
 
     _validate_finite_number("probability", probability)
-    if not 0 <= probability <= 1:
-        msg = "probability must be between 0.0 and 1.0"
+    if not _is_allowed_forecast_decimal(probability):
+        msg = "probability must be one of 10, 20, ..., 90 percent"
         raise ValueError(msg)
 
 
@@ -254,11 +257,11 @@ def _validate_interval(lower: float, upper: float) -> None:
 
 
 def _validate_confidence(confidence: float) -> None:
-    """Raise ValueError unless range confidence is finite and strictly valid."""
+    """Raise ValueError unless range confidence is on Predlog's scale."""
 
     _validate_finite_number("confidence", confidence)
-    if not 0 < confidence < 1:
-        msg = "confidence must be greater than 0.0 and less than 1.0"
+    if not _is_allowed_forecast_decimal(confidence):
+        msg = "confidence must be one of 10, 20, ..., 90 percent"
         raise ValueError(msg)
 
 
@@ -271,3 +274,13 @@ def _validate_finite_number(name: str, value: float) -> None:
     if not math.isfinite(value):
         msg = f"{name} must be a finite number"
         raise ValueError(msg)
+
+
+def _is_allowed_forecast_decimal(value: float) -> bool:
+    """Return whether a decimal forecast is an allowed 10-point value."""
+
+    percent = value * 100
+    return any(
+        math.isclose(percent, allowed, rel_tol=0.0, abs_tol=1e-9)
+        for allowed in config.FORECAST_PERCENTAGES
+    )

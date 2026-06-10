@@ -47,7 +47,7 @@ def binary(
         typer.Option(
             ...,
             "--prob",
-            help="Forecast probability as a percentage greater than 0 and less than 100.",
+            help="Forecast probability as one of 10, 20, ..., 90 percent.",
         ),
     ],
 ) -> None:
@@ -56,8 +56,6 @@ def binary(
     probability = _percentage_to_decimal(
         prob,
         name="probability",
-        allow_zero=False,
-        allow_hundred=False,
     )
     try:
         prediction = storage.add_binary_prediction(question, probability)
@@ -93,7 +91,7 @@ def range_command(
         typer.Option(
             ...,
             "--conf",
-            help="Interval confidence as a percentage greater than 0 and less than 100.",
+            help="Interval confidence as one of 10, 20, ..., 90 percent.",
         ),
     ],
 ) -> None:
@@ -102,8 +100,6 @@ def range_command(
     confidence = _percentage_to_decimal(
         conf,
         name="confidence",
-        allow_zero=False,
-        allow_hundred=False,
     )
     try:
         prediction = storage.add_range_prediction(question, low, high, confidence)
@@ -448,8 +444,7 @@ def _print_binary_calibration_table(binary_stats: stats_module.BinaryStats) -> N
     table = Table(title="Binary calibration")
     table.add_column("Bucket", justify="right")
     table.add_column("Count", justify="right")
-    table.add_column("Average predicted chance", justify="right")
-    table.add_column("Actual event rate", justify="right")
+    table.add_column("Observed event rate", justify="right")
     table.add_column("Calibration gap", justify="right")
     table.add_column("Evidence")
     table.add_column("Feedback")
@@ -458,7 +453,6 @@ def _print_binary_calibration_table(binary_stats: stats_module.BinaryStats) -> N
         table.add_row(
             _format_bucket_label(bucket.bucket),
             str(bucket.count),
-            _format_table_rate(bucket.mean_probability),
             _format_table_rate(bucket.event_rate),
             _format_table_gap(bucket.calibration_gap),
             _format_bucket_evidence(bucket.count),
@@ -561,20 +555,23 @@ def _percentage_to_decimal(
     value: float,
     *,
     name: str,
-    allow_zero: bool,
-    allow_hundred: bool,
 ) -> float:
-    """Validate a user-facing percentage and return its decimal value."""
+    """Validate a user-facing forecast percentage and return its decimal value."""
 
     if not math.isfinite(value):
         _fail(f"{name} must be a finite percentage.")
-    lower_ok = value >= 0 if allow_zero else value > 0
-    upper_ok = value <= 100 if allow_hundred else value < 100
-    if not lower_ok or not upper_ok:
-        if allow_zero and allow_hundred:
-            _fail(f"{name} must be between 0 and 100 percent.")
-        _fail(f"{name} must be greater than 0 and less than 100 percent.")
+    if not _is_allowed_forecast_percentage(value):
+        _fail(f"{name} must be one of 10, 20, ..., 90 percent.")
     return value / 100
+
+
+def _is_allowed_forecast_percentage(value: float) -> bool:
+    """Return whether a user-facing forecast percentage is allowed."""
+
+    return any(
+        math.isclose(value, allowed, rel_tol=0.0, abs_tol=1e-9)
+        for allowed in config.FORECAST_PERCENTAGES
+    )
 
 
 def _normalize_status_filter(status: str | None) -> PredictionStatus | None:

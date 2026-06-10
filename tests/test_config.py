@@ -40,6 +40,7 @@ def test_calibration_bucket_defaults():
 
     expected_buckets = tuple(range(10, 100, 10))
 
+    assert config.FORECAST_PERCENTAGES == expected_buckets
     assert config.BINARY_CALIBRATION_BUCKETS == expected_buckets
     assert config.RANGE_CONFIDENCE_BUCKETS == expected_buckets
 

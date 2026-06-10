@@ -28,17 +28,14 @@ class BinaryCalibrationBucket:
         bucket: Bucket label as a percentage from ``10`` through ``90``.
         count: Number of resolved binary predictions in the bucket.
         event_rate: Fraction of predictions in the bucket that resolved yes.
-        mean_probability: Average predicted chance for predictions in the
-            bucket, stored as a decimal from ``0.0`` to ``1.0``.
-        calibration_gap: Difference between the observed event rate and mean
-            forecast probability.
+        calibration_gap: Difference between the observed event rate and bucket
+            probability.
         feedback: Short interpretation of the calibration gap.
     """
 
     bucket: int
     count: int
     event_rate: float
-    mean_probability: float
     calibration_gap: float
     feedback: str
 
@@ -201,27 +198,15 @@ def summarize_range(predictions: Iterable[RangePrediction]) -> RangeStats:
 
 
 def nearest_probability_bucket(decimal_value: float) -> int:
-    """Return the nearest configured 10-point bucket for a decimal value.
+    """Return the configured bucket for a valid Predlog probability."""
 
-    Predlog's calibration buckets intentionally run from ``10`` through ``90``.
-    Values between those labels are assigned to the nearest 10-point bucket and
-    clamped to the configured range. For example, ``0.73`` maps to ``70`` and
-    ``0.99`` maps to ``90``.
-    """
-
-    percent = decimal_value * 100
-    nearest_ten = int(math.floor((percent / 10) + 0.5) * 10)
-    buckets = config.BINARY_CALIBRATION_BUCKETS
-    return min(max(nearest_ten, buckets[0]), buckets[-1])
+    return _forecast_decimal_to_bucket(decimal_value)
 
 
 def nearest_confidence_bucket(decimal_value: float) -> int:
-    """Return the nearest configured 10-point bucket for a confidence value."""
+    """Return the configured bucket for a valid Predlog confidence value."""
 
-    percent = decimal_value * 100
-    nearest_ten = int(math.floor((percent / 10) + 0.5) * 10)
-    buckets = config.RANGE_CONFIDENCE_BUCKETS
-    return min(max(nearest_ten, buckets[0]), buckets[-1])
+    return _forecast_decimal_to_bucket(decimal_value)
 
 
 def _resolved_binary_predictions(
@@ -263,20 +248,15 @@ def _binary_calibration_buckets(
         if not bucket_predictions:
             continue
         outcomes = [prediction.outcome for prediction in bucket_predictions]
-        probabilities = [
-            prediction.probability for prediction in bucket_predictions
-        ]
         event_rate = _mean(outcomes)
-        mean_probability = _mean(probabilities)
         assert event_rate is not None
-        assert mean_probability is not None
-        calibration_gap = event_rate - mean_probability
+        bucket_probability = bucket / 100
+        calibration_gap = event_rate - bucket_probability
         buckets.append(
             BinaryCalibrationBucket(
                 bucket=bucket,
                 count=len(bucket_predictions),
                 event_rate=event_rate,
-                mean_probability=mean_probability,
                 calibration_gap=calibration_gap,
                 feedback=_binary_calibration_feedback(
                     len(bucket_predictions),
@@ -341,6 +321,17 @@ def _binary_direction_was_hit(prediction: BinaryPrediction) -> bool:
 
     predicted_outcome = 1 if prediction.probability > 0.5 else 0
     return prediction.outcome == predicted_outcome
+
+
+def _forecast_decimal_to_bucket(decimal_value: float) -> int:
+    """Return the 10-point percentage bucket for a valid forecast decimal."""
+
+    percent = decimal_value * 100
+    for bucket in config.FORECAST_PERCENTAGES:
+        if math.isclose(percent, bucket, rel_tol=0.0, abs_tol=1e-9):
+            return bucket
+    msg = "forecast must be one of 10, 20, ..., 90 percent"
+    raise ValueError(msg)
 
 
 def _binary_calibration_feedback(count: int, calibration_gap: float) -> str:

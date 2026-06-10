@@ -32,10 +32,13 @@ BINARY_CALIBRATION_PLOT_FILENAME = "binary_calibration.png"
 RANGE_CALIBRATION_SHARPNESS_PLOT_FILENAME = "range_calibration_sharpness.png"
 """Default filename for the range calibration and sharpness plot."""
 
-BINARY_CALIBRATION_BUCKETS = tuple(range(10, 100, 10))
+FORECAST_PERCENTAGES = tuple(range(10, 100, 10))
+"""Allowed forecast percentages for probabilities and confidence levels."""
+
+BINARY_CALIBRATION_BUCKETS = FORECAST_PERCENTAGES
 """Default percentage buckets for binary calibration summaries and plots."""
 
-RANGE_CONFIDENCE_BUCKETS = tuple(range(10, 100, 10))
+RANGE_CONFIDENCE_BUCKETS = FORECAST_PERCENTAGES
 """Default percentage buckets for range confidence calibration summaries."""
 
 CALIBRATION_MIN_EVIDENCE_COUNT = 5

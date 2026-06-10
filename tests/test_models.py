@@ -205,9 +205,21 @@ def test_resolved_predictions_must_have_resolved_at():
         make_resolved_binary(resolved_at=None)
 
 
-@pytest.mark.parametrize("probability", [-0.01, 1.01, math.inf, math.nan, True])
+@pytest.mark.parametrize("probability", [n / 100 for n in range(10, 100, 10)])
+def test_binary_prediction_accepts_ten_point_probability(probability):
+    """Binary probability accepts 10-point forecast increments."""
+
+    prediction = make_open_binary(probability=probability)
+
+    assert prediction.probability == pytest.approx(probability)
+
+
+@pytest.mark.parametrize(
+    "probability",
+    [-0.01, 0.0, 0.73, 0.75, 0.95, 1.0, 1.01, math.inf, math.nan, True],
+)
 def test_binary_prediction_rejects_invalid_probability(probability):
-    """Binary probability must be finite and between 0 and 1."""
+    """Binary probability must be finite and on Predlog's 10-point scale."""
 
     with pytest.raises(ValueError):
         make_open_binary(probability=probability)
@@ -253,9 +265,21 @@ def test_range_prediction_rejects_invalid_interval(lower, upper):
         make_open_range(lower=lower, upper=upper)
 
 
-@pytest.mark.parametrize("confidence", [0.0, 1.0, -0.1, 1.1, math.inf, math.nan])
+@pytest.mark.parametrize("confidence", [n / 100 for n in range(10, 100, 10)])
+def test_range_prediction_accepts_ten_point_confidence(confidence):
+    """Range confidence accepts 10-point forecast increments."""
+
+    prediction = make_open_range(confidence=confidence)
+
+    assert prediction.confidence == pytest.approx(confidence)
+
+
+@pytest.mark.parametrize(
+    "confidence",
+    [0.0, 1.0, -0.1, 0.73, 0.75, 0.95, 1.1, math.inf, math.nan, True],
+)
 def test_range_prediction_rejects_invalid_confidence(confidence):
-    """Range confidence must be finite, greater than 0, and less than 1."""
+    """Range confidence must be finite and on Predlog's 10-point scale."""
 
     with pytest.raises(ValueError):
         make_open_range(confidence=confidence)
