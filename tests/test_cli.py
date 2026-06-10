@@ -590,6 +590,24 @@ def test_cli_help_runs():
 
     assert result.exit_code == 0, result.output
     assert "prediction journal" in result.output
+    assert "explain" in result.output
+
+
+def test_explain_stats_command_prints_metric_glossary():
+    """The explain stats command documents stats terminology in the CLI."""
+
+    result = runner.invoke(app, ["explain", "stats"])
+
+    assert result.exit_code == 0, result.output
+    assert "Stats terminology" in result.output
+    assert "Binary predictions" in result.output
+    assert "Mean Brier score" in result.output
+    assert "Correct lean rate" in result.output
+    assert "Observed event rate" in result.output
+    assert "Range predictions" in result.output
+    assert "Mean Winkler score" in result.output
+    assert "Median range factor" in result.output
+    assert "Refer to the README for more details and examples." in result.output
 
 
 def test_where_command_does_not_create_database(isolated_predlog_home):

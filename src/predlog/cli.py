@@ -33,6 +33,8 @@ app = typer.Typer(
 )
 plot_app = typer.Typer(help="Generate calibration and diagnostics plots.")
 app.add_typer(plot_app, name="plot")
+explain_app = typer.Typer(help="Explain Predlog concepts and terminology.")
+app.add_typer(explain_app, name="explain")
 console = Console(highlight=False, width=160)
 
 
@@ -256,6 +258,42 @@ def where() -> None:
     console.print(f"Plots: {_format_path(config.get_plots_dir())}")
     console.print(f"Binary plot: {_format_path(config.get_binary_plot_path())}")
     console.print(f"Range plot: {_format_path(config.get_range_plot_path())}")
+
+
+@explain_app.command("stats")
+def explain_stats() -> None:
+    """Explain the terminology used by the stats command."""
+
+    console.print("[bold]Stats terminology[/bold]")
+    console.print()
+    console.print("[bold]Binary predictions[/bold]")
+    console.print(
+        "Mean Brier score: Average yes/no forecast error. Lower is better."
+    )
+    console.print(
+        "Correct lean rate: How often your non-50 percent yes/no lean was right."
+    )
+    console.print(
+        "Bucket: The predicted chance you chose, such as 30%, 70%, or 90%."
+    )
+    console.print(
+        "Observed event rate: How often the event happened in that bucket."
+    )
+    console.print(
+        "Calibration gap: Observed event rate minus bucket probability."
+    )
+    console.print()
+    console.print("[bold]Range predictions[/bold]")
+    console.print("Mean Winkler score: Interval score. Lower is better.")
+    console.print(
+        "Containment rate: How often the actual value landed inside your range."
+    )
+    console.print("Inside range rate: Bucket-level containment rate.")
+    console.print(
+        "Median range factor: Typical multiplicative interval width. Smaller is sharper."
+    )
+    console.print()
+    console.print("Refer to the README for more details and examples.")
 
 
 @plot_app.command("binary")
