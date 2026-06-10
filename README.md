@@ -114,7 +114,9 @@ Show summary statistics for resolved predictions:
 uv run predlog stats
 ```
 
-A trimmed example looks like this:
+Here's a trimmed example output of this command:
+
+----
 
 **Binary predictions**
 
@@ -147,6 +149,9 @@ Median range factor: 2.00x
 | 40.0% | 7 | 71.4% | +31.4% | 1.35x | enough | Too wide |
 | 60.0% | 8 | 62.5% | +2.5% | 2.00x | enough | About right |
 | 80.0% | 9 | 88.9% | +8.9% | 4.50x | enough | Too wide |
+
+
+----
 
 Your exact numbers will differ, and a bucket appears only after you have resolved at least one prediction in that bucket.
 
